@@ -1,20 +1,52 @@
-.venv/
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
 __pycache__/
 *.pyc
-.env
-data/
-logs/
-.vscode/
-*.db
-*.sqlite
-.git/
-.gitignore
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+
+# Testing
+tests/
+.pytest_cache/
 htmlcov/
 .coverage
-.pytest_cache/
-*.egg-info/
+*.xml
+
+# Documentation (keep only essential)
+docs/PROGRESS.md
+docs/PLUGINS.md
+docs/TESTING.md
+BUG_REPORT.md
+TESTING_RESULTS.md
+DASHBOARD_REDESIGN.md
+HIGH_PERFORMANCE.md
+CAPABILITIES.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs and data
+logs/
+*.log
+*.db
+*.sqlite
+data/
+
+# Build
 dist/
 build/
-tests/
-docs/
-*.md
+.eggs/

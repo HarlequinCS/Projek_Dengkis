@@ -34,5 +34,5 @@ RUN chmod +x /app
 # Expose ports if needed (adjust as necessary)
 # EXPOSE 8000
 
-# Default command
-CMD ["python3", "-m", "gui.main"]
+# Default command (CLI)
+CMD ["python3", "-m", "cli.main", "--help"]

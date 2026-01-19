@@ -13,3 +13,12 @@ weasyprint
 pytest
 pytest-asyncio
 coverage
+# Performance optimization
+ujson
+# TUI Framework
+textual
+rich
+# GPU acceleration (optional)
+pyopencl
+cupy-cuda12x; sys_platform != "win32"
+# Zero-copy processing (built-in mmap)

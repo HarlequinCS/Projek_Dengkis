@@ -83,7 +83,7 @@ class AggressiveScope:
         
         return validation_result
     
-    async     async def identify_peripheral_systems(self, target: str) -> Dict:
+    async def identify_peripheral_systems(self, target: str) -> Dict:
         """
         Aggressively identify peripheral systems through various techniques
         including DNS enumeration, subdomain discovery, and network mapping.

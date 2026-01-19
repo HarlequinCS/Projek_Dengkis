@@ -11,7 +11,7 @@ from typing import Optional
 # Add engine to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from engine.runner import run_assessment
+from engine.runner import run_assessment, execute_attack
 from engine.core.session import TestSession
 from engine.network.request_handler import AggressiveRequestHandler
 from engine.utils.retry import RetryConfig
@@ -24,21 +24,29 @@ from engine.config.manager import ConfigManager
 
 
 async def cmd_scan(args):
-    """Execute security scan command."""
+    """Execute AGGRESSIVE attack scan command."""
     target = args.target
     authorized = args.authorized or False
+    attack_mode = getattr(args, 'mode', 'aggressive') or 'aggressive'
     
     logger = get_logger()
-    logger.info(f"Starting assessment for target: {target}")
+    logger.info(f"[ATTACK] Starting attack on target: {target} (mode: {attack_mode})")
     
     if not authorized:
-        logger.warning("Assessment requires authorization. Use --authorized flag.")
-        print("ERROR: Assessment requires explicit authorization.")
-        print("Use: dengkis scan <target> --authorized")
+        logger.warning("[ATTACK] Attack requires authorization. Use --authorized flag.")
+        print("=" * 70)
+        print("⚠️  ERROR: Attack requires explicit authorization.")
+        print("=" * 70)
+        print("⚠️  WARNING: This is dangerous software that exploits vulnerabilities.")
+        print("⚠️  Use ONLY on systems you own or have written permission to test.")
+        print("⚠️  Unauthorized use is ILLEGAL and may result in criminal prosecution.")
+        print("=" * 70)
+        print("Use: dengkis scan <target> --authorized --mode aggressive")
+        print("See LICENSE for complete terms and restrictions.")
         return 1
     
     # Initialize assessment
-    assessment_result = run_assessment(target, authorized=authorized)
+    assessment_result = run_assessment(target, authorized=authorized, attack_mode=attack_mode)
     
     if assessment_result.get('status') == 'error':
         logger.error(assessment_result.get('message', 'Unknown error'))
@@ -46,50 +54,66 @@ async def cmd_scan(args):
         return 1
     
     session_id = assessment_result.get('session_id')
-    session = TestSession(target=target, authorized=authorized)
     
-    logger.info(f"Assessment initialized. Session ID: {session_id}")
+    logger.info(f"[ATTACK] Attack initialized. Session ID: {session_id}")
+    print(f"\n[ATTACK] Executing {attack_mode.upper()} attack on {target}...")
+    print("=" * 60)
     
-    # Configure retry and throttle
-    retry_config = RetryConfig(
-        max_attempts=args.max_retries,
-        timeout=args.timeout
-    )
-    throttle_config = ThrottleConfig(
-        requests_per_second=args.rate_limit
-    )
-    
-    # Perform network reconnaissance
-    async with AggressiveRequestHandler(
-        stealth_mode=args.stealth,
-        timeout=args.timeout,
-        retry_config=retry_config,
-        throttle_config=throttle_config,
+    # Execute attack
+    from engine.runner import execute_attack
+    attack_results = await execute_attack(
+        target=target,
+        authorized=authorized,
+        attack_mode=attack_mode,
         session_id=session_id
-    ) as handler:
-        logger.info("Performing network reconnaissance...")
-        
-        # Extract behavioral fingerprint
-        fingerprint = await handler.extract_behavioral_fingerprint(target)
-        logger.info(f"Fingerprint extracted: {len(fingerprint.get('probes', []))} probes")
-        
-        # Store session
-        store = SessionStore()
-        session_data = {
-            'session_id': session_id,
-            'target': target,
-            'started_at': assessment_result.get('started_at'),
-            'status': 'completed',
-            'fingerprint': fingerprint,
-            'findings': []
-        }
-        store.save_session(session_data, session_id)
-        logger.info(f"Session saved: {session_id}")
-        
-        print(f"\nAssessment completed successfully!")
-        print(f"Session ID: {session_id}")
-        print(f"Target: {target}")
-        print(f"Findings: {len(session_data.get('findings', []))}")
+    )
+    
+    if attack_results.get('status') == 'error':
+        logger.error(attack_results.get('message', 'Unknown error'))
+        print(f"ERROR: {attack_results.get('message')}")
+        return 1
+    
+    # Store session
+    store = SessionStore()
+    session_data = {
+        'session_id': session_id,
+        'target': target,
+        'started_at': assessment_result.get('started_at'),
+        'status': 'completed',
+        'attack_mode': attack_mode,
+        'findings': attack_results.get('findings', []),
+        'crawl_results': attack_results.get('crawl_results', {}),
+        'detected_apps': attack_results.get('detected_apps', [])
+    }
+    store.save_session(session_data, session_id)
+    logger.info(f"[ATTACK] Session saved: {session_id}")
+    
+    # Print attack results
+    print("\n" + "=" * 60)
+    print(f"[ATTACK] ATTACK COMPLETE")
+    print("=" * 60)
+    print(f"Session ID: {session_id}")
+    print(f"Target: {target}")
+    print(f"Attack Mode: {attack_mode.upper()}")
+    print(f"\nFINDINGS: {attack_results.get('total_findings', 0)}")
+    print(f"  - High Confidence: {attack_results.get('high_confidence', 0)}")
+    print(f"  - Medium Confidence: {attack_results.get('medium_confidence', 0)}")
+    print(f"  - Low Confidence: {attack_results.get('low_confidence', 0)}")
+    
+    if attack_results.get('detected_apps'):
+        print(f"\nDETECTED VULNERABLE APPS: {len(attack_results['detected_apps'])}")
+        for app in attack_results['detected_apps']:
+            print(f"  - {app['name']} (confidence: {app['confidence']})")
+    
+    if attack_results.get('total_findings', 0) == 0:
+        print("\n[WARNING] No findings detected.")
+        if attack_results.get('detected_apps'):
+            print("[WARNING] Known vulnerable app detected but 0 findings!")
+            print("[WARNING] Manual testing recommended.")
+        else:
+            print("[INFO] Consider manual testing or different attack vectors.")
+    
+    print("\n" + "=" * 60)
     
     return 0
 
@@ -119,7 +143,11 @@ async def cmd_report(args):
     
     generator = ReportGenerator()
     
-    if args.type == 'executive':
+    # Check if this is an attack session (has attack_mode)
+    if session_data.get('attack_mode'):
+        # Generate attacker-style report
+        report_path = generator.generate_attack_report(session_data, format=args.format)
+    elif args.type == 'executive':
         report_path = generator.generate_executive_report(session_data, format=args.format)
     elif args.type == 'technical':
         report_path = generator.generate_technical_report(session_data, format=args.format)
@@ -133,6 +161,36 @@ async def cmd_report(args):
         webbrowser.open(f"file://{Path(report_path).absolute()}")
     
     return 0
+
+
+async def cmd_tui(args):
+    """Launch tactical TUI dashboard."""
+    from cli.tui_runner import run_tui_attack
+    
+    target = args.target
+    authorized = args.authorized or False
+    attack_mode = args.mode or 'aggressive'
+    
+    if not authorized:
+        print("=" * 70)
+        print("⚠️  ERROR: TUI attack requires explicit authorization.")
+        print("=" * 70)
+        print("⚠️  WARNING: This is dangerous software that exploits vulnerabilities.")
+        print("⚠️  Use ONLY on systems you own or have written permission to test.")
+        print("⚠️  Unauthorized use is ILLEGAL and may result in criminal prosecution.")
+        print("=" * 70)
+        print("Use: dengkis tui <target> --authorized")
+        print("See LICENSE for complete terms and restrictions.")
+        return 1
+    
+    try:
+        await run_tui_attack(target, attack_mode, authorized)
+        return 0
+    except Exception as e:
+        logger = get_logger()
+        logger.error(f"TUI failed: {e}", exc_info=True)
+        print(f"ERROR: {e}")
+        return 1
 
 
 async def cmd_visualize(args):
@@ -326,18 +384,31 @@ def cmd_search(args):
 
 def main():
     """Main CLI entry point."""
+    # Display warning banner
+    print("=" * 70)
+    print("⚠️  PROJEK DENGKIS - RESTRICTED USE SOFTWARE")
+    print("=" * 70)
+    print("⚠️  WARNING: This is dangerous software for AUTHORIZED use only.")
+    print("⚠️  Unauthorized use is ILLEGAL and may result in criminal prosecution.")
+    print("⚠️  Use ONLY on systems you own or have written permission to test.")
+    print("⚠️  See LICENSE for complete terms and restrictions.")
+    print("=" * 70)
+    print()
+    
     parser = argparse.ArgumentParser(
-        description='PROJEK DENGKIS - Security Assessment Framework',
-        formatter_class=argparse.RawDescriptionHelpFormatter
+        description='PROJEK DENGKIS - Security Assessment Framework (AUTHORIZED USE ONLY)',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='⚠️  WARNING: This is dangerous software. Use only with proper authorization. See LICENSE for restrictions.'
     )
     
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
     # Scan command
-    scan_parser = subparsers.add_parser('scan', help='Run security assessment')
+    scan_parser = subparsers.add_parser('scan', help='Run AGGRESSIVE attack scan')
     scan_parser.add_argument('target', help='Target URL or IP address')
-    scan_parser.add_argument('--authorized', action='store_true', help='Explicit authorization flag (required)')
-    scan_parser.add_argument('--stealth', action='store_true', help='Enable stealth mode')
+    scan_parser.add_argument('--authorized', action='store_true', help='Explicit authorization flag (REQUIRED)')
+    scan_parser.add_argument('--mode', choices=['passive', 'active', 'aggressive'], default='aggressive', help='Attack mode (default: aggressive)')
+    scan_parser.add_argument('--stealth', action='store_true', help='Enable stealth mode (reduces detection)')
     scan_parser.add_argument('--timeout', type=float, default=30.0, help='Request timeout in seconds')
     scan_parser.add_argument('--max-retries', type=int, default=3, help='Maximum retry attempts')
     scan_parser.add_argument('--rate-limit', type=float, default=10.0, help='Requests per second limit')
@@ -379,6 +450,12 @@ def main():
     search_parser.add_argument('--target', help='Filter by target')
     search_parser.add_argument('--status', help='Filter by status')
     
+    # TUI command
+    tui_parser = subparsers.add_parser('tui', help='Launch tactical TUI dashboard')
+    tui_parser.add_argument('target', help='Target URL')
+    tui_parser.add_argument('--authorized', action='store_true', help='Explicit authorization flag (REQUIRED)')
+    tui_parser.add_argument('--mode', choices=['passive', 'active', 'aggressive'], default='aggressive', help='Attack mode')
+    
     args = parser.parse_args()
     
     if not args.command:
@@ -401,6 +478,8 @@ def main():
             return cmd_batch(args)
         elif args.command == 'search':
             return cmd_search(args)
+        elif args.command == 'tui':
+            return asyncio.run(cmd_tui(args))
         else:
             parser.print_help()
             return 1

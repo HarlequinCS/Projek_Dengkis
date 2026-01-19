@@ -286,10 +286,627 @@ class ReportGenerator:
         # Use technical template for now, can be customized per framework
         return self._generate_html_report('technical.html', compliance_data, f'compliance_{framework}')
     
+    def generate_attack_report(self, assessment_data: Dict, format: str = 'html') -> str:
+        """
+        Generate ATTACKER-STYLE report with payloads, evidence, and exploitation details.
+        This is NOT a compliance report - it's an attack report.
+        
+        Args:
+            assessment_data: Complete attack results data
+            format: Output format ('html', 'json', 'markdown')
+            
+        Returns:
+            Path to generated attack report
+        """
+        findings = assessment_data.get('findings', [])
+        attack_mode = assessment_data.get('attack_mode', 'aggressive')
+        detected_apps = assessment_data.get('detected_apps', [])
+        crawl_results = assessment_data.get('crawl_results', {})
+        
+        # Group findings by category
+        findings_by_category = {}
+        for finding in findings:
+            category = finding.get('category', 'unknown')
+            if category not in findings_by_category:
+                findings_by_category[category] = []
+            findings_by_category[category].append(finding)
+        
+        # Prepare attack data
+        attack_data = {
+            'target': assessment_data.get('target', 'Unknown'),
+            'session_id': assessment_data.get('session_id', 'Unknown'),
+            'timestamp': datetime.utcnow().isoformat(),
+            'attack_mode': attack_mode.upper(),
+            'total_findings': len(findings),
+            'high_confidence': len([f for f in findings if f.get('confidence') == 'high']),
+            'medium_confidence': len([f for f in findings if f.get('confidence') == 'medium']),
+            'low_confidence': len([f for f in findings if f.get('confidence') == 'low']),
+            'findings': findings,
+            'findings_by_category': findings_by_category,
+            'detected_apps': detected_apps,
+            'endpoints_discovered': crawl_results.get('total_endpoints', 0),
+            'parameters_tested': crawl_results.get('total_parameters', 0),
+            'css': self._get_attack_css()
+        }
+        
+        if format == 'html':
+            return self._generate_attack_html_report(attack_data)
+        elif format == 'json':
+            return self._generate_json_report(attack_data, 'attack')
+        elif format == 'markdown':
+            return self._generate_attack_markdown_report(attack_data)
+        else:
+            raise ValueError(f"Unsupported format: {format}")
+    
+    def _get_attack_css(self) -> str:
+        """Get CSS for attacker-style report."""
+        return """
+        body { font-family: 'Courier New', monospace; margin: 0; padding: 20px; background-color: #0a0a0a; color: #00ff00; }
+        .header { background-color: #1a1a1a; color: #ff0000; padding: 20px; border: 2px solid #ff0000; margin-bottom: 20px; }
+        .header h1 { color: #ff0000; text-shadow: 0 0 10px #ff0000; }
+        .warning { color: #ffaa00; font-weight: bold; }
+        .critical { color: #ff0000; font-weight: bold; }
+        .high { color: #ff6600; font-weight: bold; }
+        .medium { color: #ffaa00; font-weight: bold; }
+        .low { color: #00ff00; font-weight: bold; }
+        .finding { border: 1px solid #333; padding: 15px; margin: 15px 0; background-color: #1a1a1a; }
+        .finding.vulnerable { border-left: 5px solid #ff0000; }
+        .payload { background-color: #000; padding: 10px; border: 1px solid #333; font-family: monospace; color: #00ff00; margin: 10px 0; }
+        .evidence { background-color: #1a1a1a; padding: 10px; border-left: 3px solid #ffaa00; margin: 10px 0; }
+        .endpoint { color: #00aaff; font-family: monospace; }
+        .parameter { color: #ff00ff; font-family: monospace; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; border: 1px solid #333; }
+        th, td { border: 1px solid #333; padding: 12px; text-align: left; }
+        th { background-color: #1a1a1a; color: #ff0000; }
+        tr:nth-child(even) { background-color: #0f0f0f; }
+        .summary { background-color: #1a1a1a; padding: 15px; border: 1px solid #333; margin: 20px 0; }
+        .app-detected { background-color: #330000; padding: 10px; border: 2px solid #ff0000; margin: 10px 0; }
+        """
+    
+    def _get_operator_dashboard_css(self) -> str:
+        """Get CSS for threat-centric operator dashboard."""
+        return """
+        /* Base: Terminal meets cyber warfare */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Courier New', 'Consolas', 'Monaco', monospace;
+            background-color: #0b0f14;
+            color: #e0e0e0;
+            line-height: 1.6;
+            padding: 0;
+            margin: 0;
+        }
+        
+        /* Typography */
+        h1, h2, h3, h4 { font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }
+        h1 { font-size: 1.8em; }
+        h2 { font-size: 1.4em; margin-bottom: 1em; }
+        h3 { font-size: 1.2em; }
+        h4 { font-size: 1em; }
+        
+        /* Header: Immediate Context */
+        .threat-header {
+            background-color: #0b0f14;
+            border-bottom: 2px solid #ff0000;
+            padding: 1.5em 2em;
+            margin-bottom: 2em;
+        }
+        .header-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2em;
+        }
+        .threat-title {
+            color: #ff0000;
+            font-size: 2em;
+            margin-bottom: 0.5em;
+            text-shadow: 0 0 10px #ff0000;
+        }
+        .target-info {
+            display: flex;
+            gap: 1em;
+            align-items: center;
+        }
+        .label {
+            color: #888;
+            font-size: 0.9em;
+            text-transform: uppercase;
+        }
+        .value {
+            color: #e0e0e0;
+            font-weight: 700;
+        }
+        .endpoint {
+            color: #00aaff;
+            font-family: monospace;
+        }
+        .parameter {
+            color: #ff00ff;
+            font-family: monospace;
+        }
+        .header-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5em;
+        }
+        .meta-item {
+            display: flex;
+            gap: 0.5em;
+        }
+        .mode-aggressive { color: #ff6600; }
+        .mode-active { color: #ffaa00; }
+        .mode-passive { color: #00ff00; }
+        .authorized-yes { color: #00ff00; }
+        .authorized-no { color: #ff0000; }
+        
+        /* Threat Summary */
+        .threat-summary {
+            padding: 0 2em 2em;
+        }
+        .section-title {
+            color: #ff0000;
+            border-bottom: 1px solid #333;
+            padding-bottom: 0.5em;
+            margin-bottom: 1.5em;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5em;
+        }
+        .summary-card {
+            background-color: #151920;
+            border: 1px solid #333;
+            padding: 1.5em;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1em;
+            padding-bottom: 0.5em;
+            border-bottom: 1px solid #333;
+        }
+        .card-label {
+            color: #888;
+            text-transform: uppercase;
+            font-size: 0.9em;
+        }
+        .card-value {
+            font-size: 2em;
+            font-weight: 700;
+        }
+        .exposure-critical { color: #ff0000; }
+        .exposure-high { color: #ff6600; }
+        .exposure-medium { color: #ffaa00; }
+        .exposure-low { color: #00ff00; }
+        .confidence-breakdown {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5em;
+        }
+        .confidence-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5em;
+            background-color: #0b0f14;
+        }
+        .confidence-item.high .confidence-value { color: #ff6600; }
+        .confidence-item.medium .confidence-value { color: #ffaa00; }
+        .confidence-item.low .confidence-value { color: #00ff00; }
+        .exposure-breakdown {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3em;
+            font-size: 0.9em;
+            color: #888;
+        }
+        .app-warning {
+            color: #ff0000;
+        }
+        .risk-warning, .risk-critical, .risk-high, .risk-medium, .risk-note {
+            margin: 0.5em 0;
+            padding: 0.5em;
+            background-color: #0b0f14;
+        }
+        .risk-critical { color: #ff0000; border-left: 3px solid #ff0000; }
+        .risk-high { color: #ff6600; border-left: 3px solid #ff6600; }
+        .risk-medium { color: #ffaa00; border-left: 3px solid #ffaa00; }
+        .risk-warning { color: #ffaa00; }
+        .risk-note { color: #888; font-size: 0.9em; }
+        
+        /* Detected Apps */
+        .detected-apps {
+            padding: 0 2em 2em;
+            background-color: #1a0000;
+            border: 2px solid #ff0000;
+            margin: 2em;
+        }
+        .app-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5em;
+            margin: 1em 0;
+        }
+        .app-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5em;
+            background-color: #0b0f14;
+        }
+        .app-name {
+            color: #ff0000;
+            font-weight: 700;
+        }
+        .app-warning-text {
+            color: #ff6600;
+            margin-top: 1em;
+        }
+        
+        /* Findings Section */
+        .findings-section {
+            padding: 0 2em 2em;
+        }
+        .category-section {
+            margin-bottom: 2em;
+        }
+        .category-title {
+            color: #ff6600;
+            margin-bottom: 1em;
+            padding-bottom: 0.5em;
+            border-bottom: 1px solid #333;
+        }
+        .findings-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1em;
+        }
+        .finding-card {
+            background-color: #151920;
+            border: 1px solid #333;
+            padding: 1.5em;
+        }
+        .finding-card.vulnerable {
+            border-left: 5px solid #ff0000;
+        }
+        .finding-header {
+            display: flex;
+            gap: 1em;
+            align-items: center;
+            margin-bottom: 1em;
+            padding-bottom: 0.5em;
+            border-bottom: 1px solid #333;
+        }
+        .severity-badge {
+            padding: 0.3em 0.8em;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.9em;
+        }
+        .severity-high { background-color: #ff6600; color: #0b0f14; }
+        .severity-medium { background-color: #ffaa00; color: #0b0f14; }
+        .severity-low { background-color: #00ff00; color: #0b0f14; }
+        .signal-type {
+            color: #888;
+            font-size: 0.9em;
+        }
+        .kill-chain {
+            color: #00aaff;
+            font-size: 0.9em;
+        }
+        .finding-body {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8em;
+        }
+        .finding-endpoint, .finding-parameter, .finding-method {
+            display: flex;
+            gap: 0.5em;
+        }
+        .finding-payload {
+            background-color: #0b0f14;
+            padding: 0.8em;
+            border: 1px solid #333;
+        }
+        .payload-value {
+            color: #00ff00;
+            font-family: monospace;
+        }
+        .evidence-list {
+            margin-left: 1.5em;
+            color: #ffaa00;
+        }
+        .finding-context {
+            margin-top: 1em;
+            padding-top: 1em;
+            border-top: 1px solid #333;
+        }
+        .context-item {
+            display: flex;
+            gap: 0.5em;
+            margin: 0.5em 0;
+        }
+        .context-label {
+            color: #888;
+            font-size: 0.9em;
+        }
+        .context-value {
+            color: #e0e0e0;
+        }
+        .finding-details {
+            margin-top: 1em;
+        }
+        .tech-summary {
+            color: #00aaff;
+            cursor: pointer;
+            padding: 0.5em;
+            background-color: #0b0f14;
+        }
+        .technical-details {
+            padding: 1em;
+            background-color: #0b0f14;
+            margin-top: 0.5em;
+        }
+        .detail-item {
+            display: flex;
+            gap: 0.5em;
+            margin: 0.5em 0;
+        }
+        .response-snippet {
+            background-color: #000;
+            padding: 1em;
+            overflow-x: auto;
+            font-size: 0.85em;
+            color: #888;
+        }
+        .no-findings {
+            padding: 2em;
+            background-color: #151920;
+            border: 1px solid #333;
+        }
+        .no-findings-warning {
+            color: #ffaa00;
+            font-size: 1.1em;
+            margin-bottom: 1em;
+        }
+        .no-findings-note {
+            color: #888;
+            margin: 1em 0;
+        }
+        .no-findings-list {
+            margin-left: 1.5em;
+            color: #888;
+        }
+        
+        /* Operator Insight */
+        .operator-insight {
+            padding: 0 2em 2em;
+        }
+        .insight-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5em;
+        }
+        .insight-card {
+            background-color: #151920;
+            border: 1px solid #333;
+            padding: 1.5em;
+        }
+        .insight-card.critical { border-left: 5px solid #ff0000; }
+        .insight-card.high { border-left: 5px solid #ff6600; }
+        .insight-card.medium { border-left: 5px solid #ffaa00; }
+        .insight-card.info { border-left: 5px solid #00aaff; }
+        .insight-card h4 {
+            color: #ff0000;
+            margin-bottom: 0.8em;
+        }
+        
+        /* Technical Detail */
+        .technical-detail {
+            padding: 0 2em 2em;
+        }
+        .tech-details {
+            background-color: #151920;
+            border: 1px solid #333;
+        }
+        .tech-content {
+            padding: 1em;
+            background-color: #0b0f14;
+            overflow-x: auto;
+            font-size: 0.85em;
+            color: #888;
+        }
+        """
+    
+    def _generate_operator_dashboard(self, dashboard_data: Dict) -> str:
+        """Generate operator dashboard using dedicated module."""
+        from engine.reporting.operator_dashboard import generate_operator_dashboard_html
+        return generate_operator_dashboard_html(dashboard_data, self.output_dir)
+    
+    def _generate_attack_html_report(self, attack_data: Dict) -> str:
+        """Generate HTML attack report."""
+        html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>ATTACK REPORT - {attack_data['target']}</title>
+    <style>{attack_data['css']}</style>
+</head>
+<body>
+    <div class="header">
+        <h1>⚠ ATTACK REPORT ⚠</h1>
+        <p><strong>Target:</strong> {attack_data['target']}</p>
+        <p><strong>Attack Mode:</strong> {attack_data['attack_mode']}</p>
+        <p><strong>Session ID:</strong> {attack_data['session_id']}</p>
+        <p><strong>Generated:</strong> {attack_data['timestamp']}</p>
+    </div>
+    
+    <div class="summary">
+        <h2>ATTACK SUMMARY</h2>
+        <p><strong>Total Findings:</strong> <span class="critical">{attack_data['total_findings']}</span></p>
+        <p><strong>High Confidence:</strong> <span class="high">{attack_data['high_confidence']}</span></p>
+        <p><strong>Medium Confidence:</strong> <span class="medium">{attack_data['medium_confidence']}</span></p>
+        <p><strong>Low Confidence:</strong> <span class="low">{attack_data['low_confidence']}</span></p>
+        <p><strong>Endpoints Discovered:</strong> {attack_data['endpoints_discovered']}</p>
+        <p><strong>Parameters Tested:</strong> {attack_data['parameters_tested']}</p>
+    </div>
+"""
+        
+        # Detected apps
+        if attack_data['detected_apps']:
+            html += """
+    <div class="app-detected">
+        <h2>⚠ DETECTED VULNERABLE APPS ⚠</h2>
+"""
+            for app in attack_data['detected_apps']:
+                html += f"""
+        <p><strong>{app['name']}</strong> (confidence: {app['confidence']})</p>
+"""
+            html += """
+    </div>
+"""
+        
+        # Findings by category
+        html += """
+    <h2>FINDINGS BY CATEGORY</h2>
+"""
+        for category, findings in attack_data['findings_by_category'].items():
+            html += f"""
+    <h3>{category.upper().replace('_', ' ')} ({len(findings)} findings)</h3>
+"""
+            for finding in findings:
+                vulnerable = finding.get('vulnerable', False)
+                confidence = finding.get('confidence', 'low')
+                html += f"""
+    <div class="finding {'vulnerable' if vulnerable else ''}">
+        <h4>Endpoint: <span class="endpoint">{finding.get('endpoint', 'N/A')}</span></h4>
+        <p><strong>Parameter:</strong> <span class="parameter">{finding.get('parameter', 'N/A')}</span></p>
+        <p><strong>Method:</strong> {finding.get('method', 'N/A')}</p>
+        <p><strong>Vulnerable:</strong> <span class="{'critical' if vulnerable else 'low'}">{'YES' if vulnerable else 'NO'}</span></p>
+        <p><strong>Confidence:</strong> <span class="{confidence}">{confidence.upper()}</span></p>
+        <p><strong>Category:</strong> {finding.get('category', 'N/A')}</p>
+        <p><strong>Type:</strong> {finding.get('type', 'N/A')}</p>
+        
+        <div class="payload">
+            <strong>PAYLOAD USED:</strong><br>
+            {finding.get('payload', 'N/A')}
+        </div>
+        
+        <div class="evidence">
+            <strong>EVIDENCE:</strong><br>
+            <ul>
+"""
+                for evidence_item in finding.get('evidence', []):
+                    html += f"<li>{evidence_item}</li>\n"
+                html += """
+            </ul>
+        </div>
+        
+        <p><strong>Status Code:</strong> {finding.get('status_code', 'N/A')}</p>
+        <p><strong>Response Time:</strong> {finding.get('response_time', 0):.2f}s</p>
+        
+        <details>
+            <summary>Response Snippet</summary>
+            <pre style="background: #000; padding: 10px; overflow-x: auto;">{finding.get('response_snippet', 'N/A')[:500]}</pre>
+        </details>
+        
+        <details>
+            <summary>Baseline Comparison</summary>
+            <pre style="background: #000; padding: 10px;">{json.dumps(finding.get('baseline_comparison', {}), indent=2)}</pre>
+        </details>
+    </div>
+"""
+        
+        # If no findings
+        if attack_data['total_findings'] == 0:
+            html += """
+    <div class="finding">
+        <h3>⚠ NO FINDINGS DETECTED ⚠</h3>
+        <p>No vulnerabilities were automatically detected. This could mean:</p>
+        <ul>
+            <li>The target is well-secured (unlikely)</li>
+            <li>WAF/IDS is blocking payloads</li>
+            <li>Manual testing required</li>
+            <li>Different attack vectors needed</li>
+        </ul>
+"""
+            if attack_data['detected_apps']:
+                html += """
+        <p class="warning"><strong>WARNING:</strong> Known vulnerable app detected but 0 findings! Manual testing REQUIRED.</p>
+"""
+            html += """
+    </div>
+"""
+        
+        html += """
+</body>
+</html>
+"""
+        
+        # Save report
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        filename = f"attack_report_{attack_data['session_id']}_{timestamp}.html"
+        report_path = self.output_dir / filename
+        report_path.write_text(html)
+        
+        return str(report_path)
+    
+    def _generate_attack_markdown_report(self, attack_data: Dict) -> str:
+        """Generate Markdown attack report."""
+        md = f"""# ATTACK REPORT
+
+**Target:** {attack_data['target']}  
+**Attack Mode:** {attack_data['attack_mode']}  
+**Session ID:** {attack_data['session_id']}  
+**Generated:** {attack_data['timestamp']}
+
+## ATTACK SUMMARY
+
+- **Total Findings:** {attack_data['total_findings']}
+- **High Confidence:** {attack_data['high_confidence']}
+- **Medium Confidence:** {attack_data['medium_confidence']}
+- **Low Confidence:** {attack_data['low_confidence']}
+- **Endpoints Discovered:** {attack_data['endpoints_discovered']}
+- **Parameters Tested:** {attack_data['parameters_tested']}
+
+"""
+        
+        # Detected apps
+        if attack_data['detected_apps']:
+            md += "## DETECTED VULNERABLE APPS\n\n"
+            for app in attack_data['detected_apps']:
+                md += f"- **{app['name']}** (confidence: {app['confidence']})\n"
+            md += "\n"
+        
+        # Findings
+        md += "## FINDINGS\n\n"
+        for finding in attack_data['findings']:
+            md += f"""### {finding.get('category', 'unknown').upper().replace('_', ' ')}
+
+- **Endpoint:** `{finding.get('endpoint', 'N/A')}`
+- **Parameter:** `{finding.get('parameter', 'N/A')}`
+- **Method:** {finding.get('method', 'N/A')}
+- **Vulnerable:** {'YES' if finding.get('vulnerable') else 'NO'}
+- **Confidence:** {finding.get('confidence', 'low').upper()}
+- **Payload:** `{finding.get('payload', 'N/A')}`
+
+**Evidence:**
+"""
+            for evidence_item in finding.get('evidence', []):
+                md += f"- {evidence_item}\n"
+            md += "\n"
+        
+        # Save report
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        filename = f"attack_report_{attack_data['session_id']}_{timestamp}.md"
+        report_path = self.output_dir / filename
+        report_path.write_text(md)
+        
+        return str(report_path)
+    
     def create_interactive_dashboard(self, assessment_data: Dict) -> str:
         """
-        Create interactive HTML dashboard with dynamic visualizations
-        and filtering capabilities.
+        Create threat-centric operator dashboard with tactical insights.
+        Designed for security operations, not marketing.
         
         Args:
             assessment_data: Complete assessment data
@@ -297,16 +914,54 @@ class ReportGenerator:
         Returns:
             Path to generated dashboard file
         """
+        findings = assessment_data.get('findings', [])
+        attack_mode = assessment_data.get('attack_mode', 'aggressive')
+        detected_apps = assessment_data.get('detected_apps', [])
+        crawl_results = assessment_data.get('crawl_results', {})
+        
+        # Calculate threat metrics
+        high_confidence = len([f for f in findings if f.get('confidence') == 'high'])
+        medium_confidence = len([f for f in findings if f.get('confidence') == 'medium'])
+        low_confidence = len([f for f in findings if f.get('confidence') == 'low'])
+        
+        # Group findings by category for operator analysis
+        findings_by_category = {}
+        for finding in findings:
+            category = finding.get('category', 'unknown')
+            if category not in findings_by_category:
+                findings_by_category[category] = []
+            findings_by_category[category].append(finding)
+        
+        # Calculate attack surface metrics
+        endpoints_discovered = crawl_results.get('total_endpoints', 0)
+        parameters_tested = crawl_results.get('total_parameters', 0)
+        
+        # Risk exposure score (derived from attack surface, not exploit-based)
+        # Even with 0 findings, large attack surface = higher exposure
+        exposure_score = min(100, (endpoints_discovered * 2) + (parameters_tested * 1))
+        if detected_apps:
+            exposure_score = min(100, exposure_score + 30)  # Known vulnerable apps increase exposure
+        
         dashboard_data = {
             'target': assessment_data.get('target', 'Unknown'),
+            'session_id': assessment_data.get('session_id', 'Unknown'),
             'timestamp': datetime.utcnow().isoformat(),
-            'total_findings': len(assessment_data.get('findings', [])),
-            'overall_risk_score': assessment_data.get('risk_score', 0.0),
-            'visualizations': assessment_data.get('visualizations', []),
-            'css': self.custom_css
+            'attack_mode': attack_mode.upper(),
+            'authorized': assessment_data.get('authorized', False),
+            'total_findings': len(findings),
+            'high_confidence': high_confidence,
+            'medium_confidence': medium_confidence,
+            'low_confidence': low_confidence,
+            'findings': findings,
+            'findings_by_category': findings_by_category,
+            'detected_apps': detected_apps,
+            'endpoints_discovered': endpoints_discovered,
+            'parameters_tested': parameters_tested,
+            'exposure_score': exposure_score,
+            'css': self._get_operator_dashboard_css()
         }
         
-        return self._generate_html_report('dashboard.html', dashboard_data, 'dashboard')
+        return self._generate_operator_dashboard(dashboard_data)
     
     def _generate_html_report(self, template_name: str, data: Dict, report_type: str) -> str:
         """Generate HTML report from template."""
@@ -316,7 +971,12 @@ class ReportGenerator:
             # Fallback to inline template
             template = Template(self._get_default_template(report_type))
         
-        html_content = template.render(**data, css=self.custom_css)
+        # Fix duplicate css argument: only add if not already in data
+        render_data = data.copy()
+        if 'css' not in render_data:
+            render_data['css'] = self.custom_css
+        
+        html_content = template.render(**render_data)
         
         # Save report
         filename = f"{report_type}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.html"

@@ -1,55 +1,117 @@
 """
-Advanced security assessment runner for PROJEK DENGKIS.
-Performs comprehensive read-only security evaluation through behavioral observation.
+ATTACK-DRIVEN EXPLOITATION ENGINE for PROJEK DENGKIS.
+This is NOT a passive scanner. This is an ACTIVE exploitation tool.
+Performs aggressive crawling, payload injection, and vulnerability exploitation.
 """
+import asyncio
 from datetime import datetime
 from typing import Dict, List, Optional
+import httpx
+
 from engine.core.session import TestSession
-from engine.core.advanced_result import AssessmentResult
+from engine.attack.engine import AttackEngine
 from engine.logging.logger import get_logger
 
 
-def run_assessment(target: str, authorized: bool = False, session_id: Optional[str] = None) -> Dict:
+def run_assessment(
+    target: str,
+    authorized: bool = False,
+    session_id: Optional[str] = None,
+    attack_mode: str = "aggressive"
+) -> Dict:
     """
-    Initiates comprehensive security evaluation through aggressive reconnaissance
-    and behavioral analysis techniques.
+    Initiates AGGRESSIVE attack-driven exploitation.
+    This function actively injects payloads and exploits vulnerabilities.
     
     Args:
-        target: Target system or network identifier
-        authorized: Boolean flag indicating authorization status
+        target: Target system URL
+        authorized: Boolean flag indicating authorization status (REQUIRED)
         session_id: Optional session ID (generated if not provided)
+        attack_mode: passive, active, or aggressive (default: aggressive)
         
     Returns:
-        Dictionary containing assessment initialization status
+        Dictionary containing attack results and findings
     """
     logger = get_logger(session_id)
     
     if not authorized:
-        logger.warning(f"Assessment attempt without authorization for target: {target}")
+        logger.warning(f"[ATTACK] Attack attempt without authorization for target: {target}")
         return {
             "status": "error",
-            "message": "Assessment requires explicit authorization flag",
+            "message": "Attack requires explicit authorization flag",
             "target": target
         }
     
-    logger.info(f"Initializing assessment for target: {target}")
+    logger.info(f"[ATTACK] Initializing attack on target: {target} (mode: {attack_mode})")
     
-    # Create test session for tracking assessment state
+    # Create test session for tracking attack state
     session = TestSession(target=target, authorized=authorized)
     
-    # Initialize assessment components
+    # Initialize attack components
     assessment_data = {
         "session_id": str(session.session_id),
         "target": target,
         "authorized": authorized,
+        "attack_mode": attack_mode,
         "started_at": session.started_at,
         "status": "initialized",
-        "test_vectors": [],
-        "response_patterns": {},
-        "anomaly_indicators": []
+        "findings": []
     }
     
     return assessment_data
+
+
+async def execute_attack(
+    target: str,
+    authorized: bool = False,
+    attack_mode: str = "aggressive",
+    session_id: Optional[str] = None
+) -> Dict:
+    """
+    Execute the full attack cycle using the AttackEngine.
+    
+    Args:
+        target: Target URL
+        authorized: Authorization flag
+        attack_mode: passive, active, or aggressive
+        session_id: Optional session ID
+        
+    Returns:
+        Dictionary containing complete attack results
+    """
+    logger = get_logger(session_id)
+    
+    if not authorized:
+        logger.error("[ATTACK] Attack requires explicit authorization")
+        return {
+            "status": "error",
+            "message": "Attack requires explicit authorization flag",
+            "target": target
+        }
+    
+    logger.info(f"[ATTACK] Starting attack execution on {target}")
+    
+    # Create HTTP session
+    async with httpx.AsyncClient(
+        verify=False,  # SSL verification disabled for attack
+        timeout=30.0,
+        follow_redirects=True
+    ) as client:
+        # Initialize attack engine
+        engine = AttackEngine(target, attack_mode=attack_mode, session=client)
+        
+        # Execute attack
+        attack_results = await engine.attack()
+        
+        # Add session metadata
+        attack_results["session_id"] = session_id
+        attack_results["authorized"] = authorized
+        attack_results["attack_mode"] = attack_mode
+        attack_results["status"] = "completed"
+        
+        logger.info(f"[ATTACK] Attack complete. Found {attack_results.get('total_findings', 0)} vulnerabilities")
+        
+        return attack_results
 
 
 def perform_aggressive_reconnaissance(target: str, session: TestSession) -> Dict:

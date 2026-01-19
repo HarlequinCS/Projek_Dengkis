@@ -1,21 +1,49 @@
+# Python
 .venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environment
 .env
+.env.local
+
+# Data & Logs
 data/
 logs/
-.vscode/
+*.log
 *.db
 *.sqlite
 *.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
 htmlcov/
 .coverage
 .coverage.*
 coverage.xml
 .pytest_cache/
+tests/.pytest_cache/
+
+# Build
 *.egg-info/
 dist/
 build/
+.eggs/
+
+# Storage
 storage/schedules.json
 storage/*.db
-tests/.pytest_cache/
+/opt/dengkis/db/*.db
+
+# OS
+.DS_Store
+Thumbs.db
