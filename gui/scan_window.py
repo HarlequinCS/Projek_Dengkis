@@ -499,6 +499,11 @@ class ScanWindow(tk.Toplevel):
                 finally:
                     loop.close()
                 
+                # Extract all result data from attack_results with safe defaults
+                progress_updates = attack_results.get("progress_updates", [])
+                findings = attack_results.get("findings", [])
+                stats = attack_results.get("stats", {})
+                
                 # Store session with results including exploitation data
                 session_data = {
                     'session_id': session_id,
@@ -508,7 +513,7 @@ class ScanWindow(tk.Toplevel):
                     'operation_mode': operation_mode,
                     'attack_mode': attack_mode,
                     'crawl_results': attack_results.get('crawl_results', {}),
-                    'findings': attack_results.get('findings', []),
+                    'findings': findings,
                     'total_findings': attack_results.get('total_findings', 0),
                     'flags_found': attack_results.get('flags_found', []) if operation_mode == 'flag_hunt' else [],
                     'total_flags': attack_results.get('total_flags', 0) if operation_mode == 'flag_hunt' else 0,

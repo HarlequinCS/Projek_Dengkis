@@ -353,12 +353,35 @@ class PayloadInjector:
         
         self.ghost_operator.detect_block(response)
         
-        # Hunt for flags in response
+        # Hunt for flags in response with vulnerability context
         try:
             if response.text:
-                flags = await self.flag_hunter.hunt_flags(response.text, url)
+                # Determine source based on vulnerability category
+                source = 'unknown'
+                if category in ['command_injection', 'rce']:
+                    source = 'rce'
+                elif category == 'lfi':
+                    source = 'lfi'
+                elif category == 'sql_injection':
+                    source = 'sqli'
+                elif category == 'ssti':
+                    source = 'ssti'
+                
+                flags = await self.flag_hunter.hunt_flags(
+                    response.text,
+                    url,
+                    context={
+                        'source': source,
+                        'exploitation_backed': vulnerable,
+                        'category': category,
+                        'parameter': parameter
+                    }
+                )
                 if flags:
-                    evidence.append(f"CTF flags found: {', '.join(flags)}")
+                    # Only report confirmed/high-probability flags
+                    confirmed = [f for f in flags if f.get('confidence') in ['CONFIRMED', 'HIGH_PROBABILITY']]
+                    if confirmed:
+                        evidence.append(f"CTF flags found via {source}: {', '.join([f['flag'] for f in confirmed])}")
         except Exception as e:
             self.logger.debug(f"Flag hunting failed: {e}")
         
