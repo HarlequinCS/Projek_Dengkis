@@ -27,9 +27,11 @@ class AggressiveCrawler:
     """
     
     def __init__(self, target: str, session: Optional[httpx.AsyncClient] = None):
-        self.target = target
+        # Normalize target URL
+        self.target = self._normalize_target(target)
         self.session = session
         self.logger = get_logger()
+        self.logger.info(f"[CRAWLER] Initialized with target: {self.target}")
         
         # Discovered attack surface
         self.endpoints: Set[str] = set()
@@ -77,6 +79,44 @@ class AggressiveCrawler:
             "/#/api", "/#!/api", "/#/login", "/#!/login"
         ]
     
+    def _normalize_target(self, target: str) -> str:
+        """Normalize target URL to ensure proper scheme and format."""
+        target = target.strip()
+        
+        # If no scheme, default to HTTPS
+        if not target.startswith(('http://', 'https://')):
+            target = f"https://{target}"
+        
+        # Parse and normalize
+        from urllib.parse import urlparse, urlunparse
+        parsed = urlparse(target)
+        
+        # Ensure scheme
+        scheme = parsed.scheme or 'https'
+        
+        # Ensure netloc
+        if not parsed.netloc:
+            # Try to extract domain from path
+            if parsed.path and '/' not in parsed.path:
+                netloc = parsed.path
+                path = '/'
+            else:
+                netloc = parsed.path.split('/')[0] if parsed.path else ''
+                path = '/' + '/'.join(parsed.path.split('/')[1:]) if '/' in parsed.path else '/'
+        else:
+            netloc = parsed.netloc
+            path = parsed.path or '/'
+        
+        # Normalize port (remove default ports)
+        if ':' in netloc:
+            host, port = netloc.rsplit(':', 1)
+            if (scheme == 'https' and port == '443') or (scheme == 'http' and port == '80'):
+                netloc = host
+        
+        # Reconstruct
+        normalized = urlunparse((scheme, netloc, path, parsed.params, parsed.query, parsed.fragment))
+        return normalized
+    
     async def crawl(self, max_depth: int = 3) -> Dict:
         """
         Aggressively crawl the target to discover attack surface.
@@ -87,7 +127,23 @@ class AggressiveCrawler:
         Returns:
             Dictionary containing discovered attack surface
         """
-        self.logger.info(f"[ATTACK] Starting aggressive crawl of {self.target}")
+        self.logger.info(f"[CRAWLER] Starting aggressive crawl of {self.target} (max_depth={max_depth})")
+        
+        # Execute immediate probe (GET request to root)
+        probe_count = 0
+        try:
+            self.logger.info(f"[PROBE] Executing initial probe: GET {self.target}")
+            if self.session:
+                response = await self.session.get(self.target)
+                probe_count += 1
+                self.logger.info(f"[PROBE] Initial probe completed: {response.status_code} ({probe_count} probe executed)")
+            else:
+                async with httpx.AsyncClient(verify=False, timeout=10.0) as client:
+                    response = await client.get(self.target)
+                    probe_count += 1
+                    self.logger.info(f"[PROBE] Initial probe completed: {response.status_code} ({probe_count} probe executed)")
+        except Exception as e:
+            self.logger.warning(f"[PROBE] Initial probe failed: {e}")
         
         # Start with root
         await self._crawl_url(self.target, depth=0, max_depth=max_depth)
@@ -95,15 +151,17 @@ class AggressiveCrawler:
         # Brute force common paths
         await self._brute_force_paths()
         
-        # Extract from discovered pages
-        for endpoint in list(self.endpoints)[:50]:  # Limit to prevent explosion
+        # Extract from discovered pages (more aggressive in aggressive mode)
+        endpoint_limit = 200 if max_depth >= 3 else 50  # More endpoints for deeper crawls
+        for endpoint in list(self.endpoints)[:endpoint_limit]:
             try:
                 await self._extract_from_page(endpoint)
             except Exception as e:
                 self.logger.debug(f"Failed to extract from {endpoint}: {e}")
         
-        # Extract from JS files
-        for js_url in self.js_files[:20]:  # Limit JS analysis
+        # Extract from JS files (more aggressive)
+        js_limit = 50 if max_depth >= 3 else 20
+        for js_url in self.js_files[:js_limit]:
             try:
                 await self._extract_from_js(js_url)
             except Exception as e:
@@ -129,17 +187,20 @@ class AggressiveCrawler:
             url = urljoin(self.target, url)
         
         self.endpoints.add(url)
+        self.logger.debug(f"[CRAWLER] Crawling URL (depth={depth}): {url}")
         
         try:
             if not self.session:
                 async with httpx.AsyncClient(verify=False, timeout=10.0) as client:
                     response = await client.get(url)
+                    self.logger.debug(f"[PROBE] GET {url} -> {response.status_code}")
                     await self._extract_from_response(url, response)
             else:
                 response = await self.session.get(url)
+                self.logger.debug(f"[PROBE] GET {url} -> {response.status_code}")
                 await self._extract_from_response(url, response)
         except Exception as e:
-            self.logger.debug(f"Failed to crawl {url}: {e}")
+            self.logger.warning(f"[PROBE] Failed to crawl {url}: {e}")
     
     async def _extract_from_response(self, url: str, response: httpx.Response):
         """Extract attack surface from HTTP response."""

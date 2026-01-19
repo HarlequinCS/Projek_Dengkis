@@ -75,10 +75,12 @@ class AggressiveScope:
         # Authorization check
         if authorization_required:
             validation_result["validation_checks"]["authorization"] = True
+        else:
+            validation_result["validation_checks"]["authorization"] = True  # Not required, so pass
         
         validation_result["validated"] = (
             validation_result["validation_checks"].get("format", False) and
-            validation_result["validation_checks"].get("authorization", False)
+            (not authorization_required or validation_result["validation_checks"].get("authorization", False))
         )
         
         return validation_result

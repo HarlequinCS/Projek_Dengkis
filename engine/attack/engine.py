@@ -6,7 +6,7 @@ Coordinates crawling, payload injection, and vulnerability detection.
 Unauthorized use is illegal. See LICENSE for restrictions.
 """
 import asyncio
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Callable
 import httpx
 
 from engine.attack.crawler import AggressiveCrawler
@@ -27,10 +27,29 @@ class AttackEngine:
     4. Finding generation
     """
     
-    def __init__(self, target: str, attack_mode: str = "aggressive", session: Optional[httpx.AsyncClient] = None):
+    def __init__(self, target: str, attack_mode: str = "aggressive", session: Optional[httpx.AsyncClient] = None, operation_mode: str = "attack", progress_callback: Optional[Callable] = None):
+        """
+        Initialize attack engine.
+        
+        Args:
+            target: Target URL
+            attack_mode: passive, active, or aggressive
+            session: HTTP session
+            operation_mode: "attack" for vulnerability hunting, "flag_hunt" for CTF flag hunting
+            progress_callback: Optional callback for real-time progress updates
+        """
+        # Validate inputs
+        if not target or not isinstance(target, str):
+            raise ValueError("Target must be a non-empty string")
+        if attack_mode not in ["passive", "active", "aggressive"]:
+            raise ValueError(f"Invalid attack_mode: {attack_mode}. Must be 'passive', 'active', or 'aggressive'")
+        if operation_mode not in ["attack", "flag_hunt"]:
+            raise ValueError(f"Invalid operation_mode: {operation_mode}. Must be 'attack' or 'flag_hunt'")
         self.target = target
         self.attack_mode = attack_mode
+        self.operation_mode = operation_mode  # "attack" or "flag_hunt"
         self.session = session
+        self.progress_callback = progress_callback
         self.logger = get_logger()
         
         self.crawler = AggressiveCrawler(target, session)
@@ -40,12 +59,53 @@ class AttackEngine:
         self.red_team_architect = RedTeamArchitect(session)
         self.attacker_mindset = AttackerMindset()
         
+        # Set progress callback for real-time updates
+        if progress_callback:
+            self.injector.set_progress_callback(progress_callback)
+        
+        # Flag hunt engine for CTF mode
+        if operation_mode == "flag_hunt":
+            from engine.attack.flag_hunt_engine import FlagHuntEngine
+            self.flag_hunt_engine = FlagHuntEngine(target, session)
+        
         self.findings: List[Dict] = []
         self.crawl_results: Optional[Dict] = None
     
     async def attack(self) -> Dict:
         """
-        Execute full attack cycle:
+        Execute full attack cycle or flag hunt based on operation_mode.
+        
+        Returns:
+            Dictionary containing attack results and findings
+        """
+        if self.operation_mode == "flag_hunt":
+            return await self._flag_hunt()
+        
+        return await self._vulnerability_attack()
+    
+    async def _flag_hunt(self) -> Dict:
+        """Execute aggressive flag hunting."""
+        self.logger.info(f"[FLAG HUNT] Starting flag hunt on {self.target}")
+        flag_results = await self.flag_hunt_engine.hunt_flags()
+        
+        return {
+            "target": self.target,
+            "operation_mode": "flag_hunt",
+            "attack_mode": self.attack_mode,
+            "flags_found": flag_results.get("flags", []),
+            "total_flags": flag_results.get("total_flags", 0),
+            "web_flags": flag_results.get("web_flags", {}),
+            "network_flags": flag_results.get("network_flags", {}),
+            "crawl_flags": flag_results.get("crawl_flags", {}),
+            "header_flags": flag_results.get("header_flags", {}),
+            "source_flags": flag_results.get("source_flags", {}),
+            "all_flags": flag_results.get("all_flags", {}),
+            "status": "completed"
+        }
+    
+    async def _vulnerability_attack(self) -> Dict:
+        """
+        Execute full vulnerability attack cycle:
         1. Detect known vulnerable apps
         2. Aggressively crawl attack surface
         3. Inject payloads into all parameters
@@ -97,10 +157,11 @@ class AttackEngine:
         self.logger.info("[ATTACK] Phase 5: Generating attacker insights...")
         intelligence_report = self.attacker_mindset.generate_intelligence_report(self.findings)
         
-        # Step 7: Generate attack report
+        # Step 7: Generate attack report with exploitation results
         results = {
             "target": self.target,
             "attack_mode": self.attack_mode,
+            "operation_mode": self.operation_mode,
             "detected_apps": detected_apps,
             "crawl_results": self.crawl_results,
             "findings": self.findings,
@@ -114,6 +175,11 @@ class AttackEngine:
             "attacker_intelligence": intelligence_report,
             "network_map": self.red_team_architect.get_network_map(),
             "credentials_found": self.red_team_architect.get_credentials(),
+            # Exploitation results
+            "exploitation_results": self.injector.exploiter.get_exploitation_results(),
+            "failed_exploits": self.injector.exploiter.get_failed_exploits(),
+            "successful_exploits": len([r for r in self.injector.exploiter.get_exploitation_results() if r.get("success")]),
+            "total_exploitation_attempts": len(self.injector.exploiter.get_exploitation_results()) + len(self.injector.exploiter.get_failed_exploits()),
         }
         
         # NEVER return 0 findings silently for known vulnerable apps

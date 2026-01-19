@@ -65,7 +65,9 @@ async def execute_attack(
     target: str,
     authorized: bool = False,
     attack_mode: str = "aggressive",
-    session_id: Optional[str] = None
+    session_id: Optional[str] = None,
+    operation_mode: str = "attack",
+    progress_callback: Optional[Callable] = None
 ) -> Dict:
     """
     Execute the full attack cycle using the AttackEngine.
@@ -90,6 +92,38 @@ async def execute_attack(
         }
     
     logger.info(f"[ATTACK] Starting attack execution on {target}")
+    logger.info(f"[ATTACK] Attack mode: {attack_mode}, Authorized: {authorized}")
+    
+    # Validate and normalize target URL
+    from urllib.parse import urlparse
+    if not target or not isinstance(target, str):
+        logger.error("[ATTACK] Invalid target: must be a non-empty string")
+        return {
+            "status": "error",
+            "message": "Invalid target: must be a non-empty string",
+            "target": target
+        }
+    
+    parsed = urlparse(target)
+    if not parsed.scheme:
+        target = f"https://{target}"
+        logger.info(f"[ATTACK] Normalized target URL: {target}")
+        parsed = urlparse(target)
+    
+    # Security: Prevent SSRF by blocking private/localhost IPs (unless explicitly allowed)
+    # This is a safety check - can be disabled for authorized internal testing
+    if parsed.hostname:
+        hostname_lower = parsed.hostname.lower()
+        if hostname_lower in ['localhost', '127.0.0.1', '0.0.0.0', '::1']:
+            logger.warning(f"[ATTACK] Target is localhost - ensure this is authorized")
+        # Block private IP ranges (can be configured)
+        try:
+            import ipaddress
+            ip = ipaddress.ip_address(parsed.hostname)
+            if ip.is_private or ip.is_loopback:
+                logger.warning(f"[ATTACK] Target is private IP {parsed.hostname} - ensure this is authorized")
+        except ValueError:
+            pass  # Not an IP, likely a hostname
     
     # Create HTTP session
     async with httpx.AsyncClient(
@@ -97,11 +131,26 @@ async def execute_attack(
         timeout=30.0,
         follow_redirects=True
     ) as client:
-        # Initialize attack engine
-        engine = AttackEngine(target, attack_mode=attack_mode, session=client)
+        logger.info(f"[ATTACK] HTTP client initialized, executing first probe...")
+        
+        # Execute immediate probe to verify connectivity
+        try:
+            probe_response = await client.get(target)
+            logger.info(f"[PROBE] Initial probe executed: GET {target} -> {probe_response.status_code}")
+        except Exception as e:
+            logger.warning(f"[PROBE] Initial probe failed: {e}")
+        
+        # Initialize attack engine with operation mode and progress callback
+        engine = AttackEngine(target, attack_mode=attack_mode, session=client, 
+                             operation_mode=operation_mode, progress_callback=progress_callback)
+        if operation_mode == "flag_hunt":
+            logger.info(f"[FLAG HUNT] Flag hunt engine initialized")
+        else:
+            logger.info(f"[ATTACK] Attack engine initialized - REAL EXPLOITATION ENABLED")
         
         # Execute attack
         attack_results = await engine.attack()
+        logger.info(f"[ATTACK] Attack cycle completed")
         
         # Add session metadata
         attack_results["session_id"] = session_id

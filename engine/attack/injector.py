@@ -4,13 +4,14 @@ Injects payloads into every discovered parameter and analyzes responses.
 """
 import asyncio
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Callable
 from urllib.parse import urlparse, urlencode, parse_qs
 import httpx
 
 from engine.attack.payloads import PayloadLibrary
 from engine.attack.flag_hunter import FlagHunter
 from engine.attack.ghost_operator import GhostOperator
+from engine.attack.exploiter import Exploiter
 from engine.logging.logger import get_logger
 
 
@@ -31,6 +32,16 @@ class PayloadInjector:
         # Advanced modules
         self.flag_hunter = FlagHunter(session)
         self.ghost_operator = GhostOperator(session)
+        self.exploiter = Exploiter(session)  # Actual exploitation engine
+        
+        # Aggressive mode settings
+        self.aggressive = (attack_mode == "aggressive")
+        if self.aggressive:
+            self.logger.info("[ATTACK] AGGRESSIVE MODE: Maximum payload coverage enabled")
+    
+    def set_progress_callback(self, callback):
+        """Set progress callback for real-time updates."""
+        self.exploiter.progress_callback = callback
     
     async def inject_all(self, endpoints: List[str], parameters: Dict[str, List[str]]) -> List[Dict]:
         """
@@ -59,9 +70,12 @@ class PayloadInjector:
                 # Test endpoint without parameters too
                 tasks.append(self._inject_endpoint(endpoint))
         
-        # Execute with concurrency limit
-        for i in range(0, len(tasks), 20):  # 20 concurrent injections
-            batch = tasks[i:i+20]
+        # Execute with concurrency limit (more aggressive in aggressive mode)
+        concurrency = 50 if self.aggressive else 20
+        self.logger.info(f"[ATTACK] Using {concurrency} concurrent injections")
+        
+        for i in range(0, len(tasks), concurrency):
+            batch = tasks[i:i+concurrency]
             results = await asyncio.gather(*batch, return_exceptions=True)
             for result in results:
                 if isinstance(result, dict) and result.get("vulnerable"):
@@ -348,22 +362,71 @@ class PayloadInjector:
         except Exception as e:
             self.logger.debug(f"Flag hunting failed: {e}")
         
-        # If vulnerable, trigger post-exploitation modules
+        # If vulnerable, ACTUALLY EXPLOIT IT (black hat behavior, white hat mindset)
         exfiltration_data = {}
+        exploitation_result = {}
+        
         if vulnerable:
             try:
-                if category == "command_injection" or category == "rce" or "command" in category.lower():
-                    # Trigger RCE exfiltration
-                    exfiltration_data = await self.flag_hunter.execute_rce_commands(
-                        url, parameter, payload
+                # Actually exploit the vulnerability
+                if category == "sql_injection" or "sql" in category.lower():
+                    exploitation_result = await self.exploiter.exploit_sql_injection(
+                        url, parameter, payload, method
                     )
+                    if exploitation_result.get("success"):
+                        exfiltration_data = exploitation_result.get("data_extracted", {})
+                
+                elif category == "command_injection" or category == "rce" or "command" in category.lower():
+                    # Actually execute commands
+                    exploitation_result = await self.exploiter.exploit_command_injection(
+                        url, parameter, payload, method
+                    )
+                    if exploitation_result.get("success"):
+                        exfiltration_data = {
+                            "commands_executed": exploitation_result.get("commands_executed", []),
+                            "output": exploitation_result.get("output", {})
+                        }
+                    # Also use flag hunter for additional data
+                    try:
+                        flag_data = await self.flag_hunter.execute_rce_commands(url, parameter, payload)
+                        exfiltration_data.update(flag_data)
+                    except Exception:
+                        pass
+                
                 elif category == "lfi" or "lfi" in category.lower():
-                    # Trigger LFI config crawl
-                    exfiltration_data = await self.flag_hunter.lfi_config_crawl(
-                        url, parameter, payload
-                    )
+                    # Actually read files
+                    exploitation_result = await self.exploiter.exploit_lfi(url, parameter, payload)
+                    if exploitation_result.get("success"):
+                        exfiltration_data = {
+                            "files_read": exploitation_result.get("files_read", []),
+                            "file_contents": exploitation_result.get("file_contents", {})
+                        }
+                    # Also use flag hunter
+                    try:
+                        flag_data = await self.flag_hunter.lfi_config_crawl(url, parameter, payload)
+                        exfiltration_data.update(flag_data)
+                    except Exception:
+                        pass
+                
+                elif category == "xss":
+                    # Verify XSS execution
+                    exploitation_result = await self.exploiter.exploit_xss(url, parameter, payload, method)
+                    if exploitation_result.get("success"):
+                        exfiltration_data = {
+                            "payload_reflected": exploitation_result.get("payload_reflected", False),
+                            "execution_verified": exploitation_result.get("execution_verified", False)
+                        }
+                
             except Exception as e:
-                self.logger.debug(f"Exfiltration failed for {category}: {e}")
+                error_msg = str(e)
+                self.logger.warning(f"[EXPLOIT] Exploitation failed for {category}: {error_msg}")
+                # Store failure reason
+                if not exploitation_result:
+                    exploitation_result = {
+                        "success": False,
+                        "error": error_msg,
+                        "reason": f"Exception during exploitation: {error_msg}"
+                    }
         
         if vulnerable or len(evidence) > 0:
             finding = {
@@ -387,7 +450,21 @@ class PayloadInjector:
                 }
             }
             
-            # Add exfiltration data if available
+            # Add exploitation and exfiltration data
+            if exfiltration_data:
+                finding["exfiltration_data"] = exfiltration_data
+            
+            if exploitation_result:
+                finding["exploitation_result"] = exploitation_result
+                finding["exploited"] = exploitation_result.get("success", False)
+                
+                # Add failure reason if exploitation failed
+                if not exploitation_result.get("success"):
+                    finding["exploitation_failure"] = {
+                        "reason": exploitation_result.get("reason", exploitation_result.get("error", "Unknown error")),
+                        "details": exploitation_result
+                    }
+            
             if exfiltration_data:
                 finding["exfiltration"] = exfiltration_data
             

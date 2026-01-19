@@ -22,7 +22,7 @@ class FlagHunter:
         self.flags_found: Set[str] = set()
         self.exfiltrated_data: List[Dict] = []
         
-        # Flag patterns (CTF formats)
+        # Extended flag patterns (CTF formats)
         self.flag_patterns = [
             r'FLAG\{[^}]+\}',
             r'CTF\{[^}]+\}',
@@ -30,6 +30,15 @@ class FlagHunter:
             r'ctf\{[^}]+\}',
             r'[A-Z0-9]{32}',  # MD5-like flags
             r'[A-Z0-9]{40}',  # SHA1-like flags
+            r'[A-Z0-9]{64}',  # SHA256-like flags
+            r'[a-f0-9]{32}',  # Lowercase hex (MD5)
+            r'[a-f0-9]{40}',  # Lowercase hex (SHA1)
+            r'[a-f0-9]{64}',  # Lowercase hex (SHA256)
+            r'[A-Za-z0-9+/]{43}=',  # Base64-like
+            r'[A-Za-z0-9_-]{20,}',  # Long alphanumeric strings
+            r'picoCTF\{[^}]+\}',  # picoCTF format
+            r'HTB\{[^}]+\}',  # HackTheBox format
+            r'THM\{[^}]+\}',  # TryHackMe format
         ]
     
     async def hunt_flags(self, response_text: str, endpoint: str) -> List[str]:

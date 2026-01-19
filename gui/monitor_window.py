@@ -6,12 +6,14 @@ import tkinter as tk
 from tkinter import ttk
 
 from gui.components.log_viewer import LogViewer
+from gui.components.attack_monitor import AttackMonitor
+from gui.theme import COLORS, FONTS
 from engine.logging.logger import get_logger
 from engine.storage.session_store import SessionStore
 
 
 class MonitorWindow(tk.Toplevel):
-    """Real-time monitoring window for active scans."""
+    """Real-time monitoring window for active attacks with live progress."""
     
     def __init__(self, parent, app, session_id: str):
         super().__init__(parent)
@@ -20,90 +22,146 @@ class MonitorWindow(tk.Toplevel):
         self.logger = get_logger(session_id)
         self.store = SessionStore()
         
-        self.title(f"Monitor - Session {session_id[:8]}")
-        self.geometry("800x600")
+        # Apply dark theme
+        self.configure(bg=COLORS['bg_primary'])
+        
+        self.title(f"DENGKIS // LIVE ATTACK MONITOR // {session_id[:8]}")
+        self.geometry("1000x700")
         self.transient(parent)
         
         # Center window
         self.update_idletasks()
-        x = (self.winfo_screenwidth() // 2) - (800 // 2)
-        y = (self.winfo_screenheight() // 2) - (600 // 2)
-        self.geometry(f"800x600+{x}+{y}")
+        x = (self.winfo_screenwidth() // 2) - (1000 // 2)
+        y = (self.winfo_screenheight() // 2) - (700 // 2)
+        self.geometry(f"1000x700+{x}+{y}")
         
         self._create_layout()
         self._load_session_data()
     
     def _create_layout(self):
-        """Create monitor window layout."""
-        # Main frame
-        main_frame = ttk.Frame(self, padding=10)
-        main_frame.pack(fill=tk.BOTH, expand=True)
-        
+        """Create monitor window layout with live attack monitor."""
         # Header
-        header_frame = ttk.Frame(main_frame)
-        header_frame.pack(fill=tk.X, pady=(0, 10))
+        header_frame = tk.Frame(self, bg=COLORS['bg_primary'], height=60)
+        header_frame.pack(fill=tk.X, padx=10, pady=10)
+        header_frame.pack_propagate(False)
         
-        ttk.Label(header_frame, text=f"Session ID: {self.session_id}", font=('Arial', 12, 'bold')).pack(side=tk.LEFT)
+        title_label = tk.Label(header_frame, text=f"LIVE ATTACK MONITOR // SESSION: {self.session_id[:12]}", 
+                              bg=COLORS['bg_primary'], fg=COLORS['accent_red'],
+                              font=FONTS['monospace_large'])
+        title_label.pack()
         
-        refresh_btn = ttk.Button(header_frame, text="Refresh", command=self._refresh)
-        refresh_btn.pack(side=tk.RIGHT)
+        # Main notebook
+        notebook = ttk.Notebook(self, style='Dark.TNotebook')
+        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # Progress frame
-        progress_frame = ttk.LabelFrame(main_frame, text="Progress", padding=10)
-        progress_frame.pack(fill=tk.X, pady=(0, 10))
+        # Tab 1: Live Attack Monitor
+        monitor_frame = ttk.Frame(notebook, style='Dark.TFrame')
+        notebook.add(monitor_frame, text="[LIVE ATTACK]")
         
-        self.status_label = ttk.Label(progress_frame, text="Status: Active")
-        self.status_label.pack(anchor=tk.W)
+        self.attack_monitor = AttackMonitor(monitor_frame)
+        self.attack_monitor.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        self.progress_bar = ttk.Progressbar(progress_frame, mode='indeterminate')
-        self.progress_bar.pack(fill=tk.X, pady=5)
-        self.progress_bar.start()
+        # Tab 2: Session Info
+        info_frame = ttk.Frame(notebook, style='Dark.TFrame')
+        notebook.add(info_frame, text="[SESSION INFO]")
+        self._create_info_tab(info_frame)
         
-        # Session info frame
-        info_frame = ttk.LabelFrame(main_frame, text="Session Information", padding=10)
-        info_frame.pack(fill=tk.X, pady=(0, 10))
+        # Tab 3: Logs
+        logs_frame = ttk.Frame(notebook, style='Dark.TFrame')
+        notebook.add(logs_frame, text="[LOGS]")
         
-        self.info_text = tk.Text(info_frame, height=5, wrap=tk.WORD)
-        self.info_text.pack(fill=tk.X)
-        self.info_text.config(state=tk.DISABLED)
-        
-        # Log viewer
-        logs_frame = ttk.LabelFrame(main_frame, text="Activity Logs", padding=10)
-        logs_frame.pack(fill=tk.BOTH, expand=True)
-        
-        self.log_viewer = LogViewer(logs_frame, height=200)
-        self.log_viewer.pack(fill=tk.BOTH, expand=True)
+        self.log_viewer = LogViewer(logs_frame, height=300)
+        self.log_viewer.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # Buttons
-        button_frame = ttk.Frame(main_frame)
-        button_frame.pack(fill=tk.X, pady=(10, 0))
+        button_frame = tk.Frame(self, bg=COLORS['bg_primary'])
+        button_frame.pack(fill=tk.X, padx=10, pady=10)
         
-        ttk.Button(button_frame, text="View Report", command=self._view_report).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Visualize", command=self._visualize).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Close", command=self.destroy).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(button_frame, text="[REFRESH]", command=self._refresh,
+                  style='Dark.TButton').pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="[REPORT]", command=self._view_report,
+                  style='Primary.TButton').pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="[CLOSE]", command=self.destroy,
+                  style='Dark.TButton').pack(side=tk.RIGHT, padx=5)
+    
+    def _create_info_tab(self, parent):
+        """Create session info tab."""
+        info_frame = ttk.LabelFrame(parent, text="SESSION INFORMATION", 
+                                    style='Dark.TLabelframe', padding=10)
+        info_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        self.info_text = tk.Text(info_frame, height=20, wrap=tk.WORD,
+                                bg=COLORS['bg_tertiary'], fg=COLORS['fg_primary'],
+                                font=FONTS['monospace'],
+                                borderwidth=1, relief='solid')
+        self.info_text.pack(fill=tk.BOTH, expand=True)
+        self.info_text.config(state=tk.DISABLED)
     
     def _load_session_data(self):
         """Load and display session data."""
         session_data = self.store.load_session(self.session_id)
         
         if session_data:
-            # Update status
-            status = session_data.get('status', 'unknown')
-            self.status_label.config(text=f"Status: {status.title()}")
+            # Update attack monitor with progress updates
+            progress_updates = session_data.get('progress_updates', [])
+            for update in progress_updates:
+                self.attack_monitor.add_progress(
+                    update.get('message', ''),
+                    update.get('status', 'info'),
+                    update.get('data')
+                )
             
-            if status == 'completed':
-                self.progress_bar.stop()
-                self.progress_bar.config(mode='determinate', value=100)
+            # Add successful exploits
+            exploitation_results = session_data.get('exploitation_results', [])
+            for result in exploitation_results:
+                if result.get('success'):
+                    self.attack_monitor.add_success(result)
+            
+            # Add failed exploits
+            failed_exploits = session_data.get('failed_exploits', [])
+            for failure in failed_exploits:
+                self.attack_monitor.add_failure(failure)
             
             # Update info
             self.info_text.config(state=tk.NORMAL)
             self.info_text.delete(1.0, tk.END)
             info_content = f"Target: {session_data.get('target', 'Unknown')}\n"
             info_content += f"Started: {session_data.get('started_at', 'Unknown')}\n"
-            info_content += f"Completed: {session_data.get('completed_at', 'In Progress')}\n"
-            fingerprint = session_data.get('fingerprint', {})
-            probes = fingerprint.get('probes', [])
-            info_content += f"Probes Executed: {len(probes)}"
+            info_content += f"Status: {session_data.get('status', 'In Progress')}\n"
+            
+            # Count probes from crawl results (endpoints discovered = probes executed)
+            crawl_results = session_data.get('crawl_results', {})
+            endpoints = crawl_results.get('endpoints_discovered', [])
+            total_probes = len(endpoints)
+            
+            # Also count from findings (each finding represents a probe)
+            findings = session_data.get('findings', [])
+            if total_probes == 0 and len(findings) > 0:
+                total_probes = len(findings)
+            
+            info_content += f"Probes Executed: {total_probes}\n"
+            info_content += f"Endpoints Discovered: {len(endpoints)}\n"
+            info_content += f"Findings: {len(findings)}\n\n"
+            
+            # Count successful exploits
+            successful_exploits = len([f for f in findings if f.get('exploited', False)])
+            failed_exploits = len([f for f in findings if f.get('exploitation_failure')])
+            
+            info_content += f"EXPLOITATION RESULTS:\n"
+            info_content += f"Successful Exploits: {successful_exploits}\n"
+            info_content += f"Failed Exploits: {failed_exploits}\n\n"
+            
+            # Show failed exploits with reasons
+            if failed_exploits > 0:
+                info_content += f"FAILED EXPLOITS (with reasons):\n"
+                for finding in findings:
+                    if finding.get('exploitation_failure'):
+                        failure = finding['exploitation_failure']
+                        info_content += f"- {finding.get('category', 'unknown')} on {finding.get('endpoint', 'unknown')}\n"
+                        info_content += f"  REASON: {failure.get('reason', 'Unknown')}\n"
+            
+            self.info_text.config(state=tk.NORMAL)
+            self.info_text.delete(1.0, tk.END)
             self.info_text.insert(1.0, info_content)
             self.info_text.config(state=tk.DISABLED)
             

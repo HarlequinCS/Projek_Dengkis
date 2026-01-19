@@ -59,22 +59,27 @@ class ScanWindow(tk.Toplevel):
         notebook = ttk.Notebook(self, style='Dark.TNotebook')
         notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # Tab 1: Basic Configuration
+        # Tab 1: Operation Mode
+        mode_frame = ttk.Frame(notebook, style='Dark.TFrame')
+        notebook.add(mode_frame, text="[MODE]")
+        self._create_mode_tab(mode_frame)
+        
+        # Tab 2: Basic Configuration
         basic_frame = ttk.Frame(notebook, style='Dark.TFrame')
         notebook.add(basic_frame, text="[BASIC]")
         self._create_basic_tab(basic_frame)
         
-        # Tab 2: Attack Modes
+        # Tab 3: Attack Modes
         attack_frame = ttk.Frame(notebook, style='Dark.TFrame')
         notebook.add(attack_frame, text="[ATTACK MODES]")
         self._create_attack_tab(attack_frame)
         
-        # Tab 3: Advanced Modules
+        # Tab 4: Advanced Modules
         advanced_frame = ttk.Frame(notebook, style='Dark.TFrame')
         notebook.add(advanced_frame, text="[ADVANCED MODULES]")
         self._create_advanced_tab(advanced_frame)
         
-        # Tab 4: Performance
+        # Tab 5: Performance
         perf_frame = ttk.Frame(notebook, style='Dark.TFrame')
         notebook.add(perf_frame, text="[PERFORMANCE]")
         self._create_performance_tab(perf_frame)
@@ -87,6 +92,66 @@ class ScanWindow(tk.Toplevel):
                   style='Danger.TButton').pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="[CANCEL]", command=self.destroy,
                   style='Dark.TButton').pack(side=tk.LEFT, padx=5)
+    
+    def _create_mode_tab(self, parent):
+        """Create operation mode selection tab."""
+        main_frame = ttk.LabelFrame(parent, text="OPERATION MODE", 
+                                    style='Dark.TLabelframe', padding=15)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Mode selection
+        mode_frame = ttk.LabelFrame(main_frame, text="SELECT MODE", style='Dark.TLabelframe', padding=10)
+        mode_frame.pack(fill=tk.X, pady=10)
+        
+        self.operation_mode_var = tk.StringVar(value="attack")
+        
+        # Attack mode
+        attack_frame = ttk.Frame(mode_frame, style='Dark.TFrame')
+        attack_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Radiobutton(attack_frame, text="[ATTACK MODE]", variable=self.operation_mode_var, 
+                       value="attack", style='Dark.TRadiobutton').pack(side=tk.LEFT, padx=5)
+        tk.Label(attack_frame, text="Find vulnerabilities and exploit them", 
+                bg=COLORS['bg_secondary'], fg=COLORS['fg_primary'],
+                font=FONTS['monospace']).pack(side=tk.LEFT, padx=10)
+        
+        # Flag Hunt mode
+        flag_frame = ttk.Frame(mode_frame, style='Dark.TFrame')
+        flag_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Radiobutton(flag_frame, text="[FLAG HUNT MODE]", variable=self.operation_mode_var, 
+                       value="flag_hunt", style='Dark.TRadiobutton').pack(side=tk.LEFT, padx=5)
+        tk.Label(flag_frame, text="Focus on finding CTF flags (network & web)", 
+                bg=COLORS['bg_secondary'], fg=COLORS['accent_yellow'],
+                font=FONTS['monospace']).pack(side=tk.LEFT, padx=10)
+        
+        # Mode descriptions
+        desc_frame = ttk.LabelFrame(main_frame, text="MODE DESCRIPTIONS", style='Dark.TLabelframe', padding=10)
+        desc_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        attack_desc = """
+[ATTACK MODE]
+- Aggressive vulnerability discovery
+- Payload injection and exploitation
+- Business logic testing
+- Post-exploitation capabilities
+- Full attack surface mapping
+        """
+        
+        flag_desc = """
+[FLAG HUNT MODE]
+- Network port scanning for flags
+- Deep web crawling for hidden flags
+- Response header/body analysis
+- Source code flag scanning
+- Common flag location checking
+- Optimized for CTF competitions
+        """
+        
+        tk.Label(desc_frame, text=attack_desc, bg=COLORS['bg_secondary'], fg=COLORS['fg_primary'],
+                font=FONTS['monospace_small'], justify=tk.LEFT, anchor='w').pack(anchor=tk.W, pady=5)
+        tk.Label(desc_frame, text=flag_desc, bg=COLORS['bg_secondary'], fg=COLORS['accent_yellow'],
+                font=FONTS['monospace_small'], justify=tk.LEFT, anchor='w').pack(anchor=tk.W, pady=5)
     
     def _create_basic_tab(self, parent):
         """Create basic configuration tab."""
@@ -243,6 +308,55 @@ class ScanWindow(tk.Toplevel):
         ttk.Checkbutton(mindset_frame, text="Enable attacker-style intelligence reports (kill chain, PoC generation)",
                        variable=self.mindset_var, style='Dark.TCheckbutton').pack(anchor=tk.W)
     
+    def _normalize_target_url(self, target: str) -> str:
+        """Normalize target URL - ensure proper scheme and format."""
+        target = target.strip()
+        
+        # If no scheme, assume HTTPS for CTF/live targets
+        if not target.startswith(('http://', 'https://')):
+            target = f"https://{target}"
+        
+        # Parse and reconstruct to normalize
+        from urllib.parse import urlparse, urlunparse
+        parsed = urlparse(target)
+        
+        # Ensure scheme is http or https
+        if not parsed.scheme:
+            scheme = 'https'  # Default to HTTPS for security
+        else:
+            scheme = parsed.scheme
+        
+        # Ensure netloc (domain) exists
+        if not parsed.netloc:
+            # If path looks like domain, use it as netloc
+            if '/' not in target.replace('://', ''):
+                netloc = target.replace('http://', '').replace('https://', '')
+                path = '/'
+            else:
+                return target  # Can't normalize, return as-is
+        else:
+            netloc = parsed.netloc
+            path = parsed.path or '/'
+        
+        # Normalize port (443 for HTTPS, 80 for HTTP)
+        if ':' in netloc:
+            host, port = netloc.rsplit(':', 1)
+            if scheme == 'https' and port == '443':
+                netloc = host  # Remove default port
+            elif scheme == 'http' and port == '80':
+                netloc = host
+        elif scheme == 'https' and ':' not in netloc:
+            # HTTPS default port 443 (implicit)
+            pass
+        elif scheme == 'http' and ':' not in netloc:
+            # HTTP default port 80 (implicit)
+            pass
+        
+        # Reconstruct URL
+        normalized = urlunparse((scheme, netloc, path, parsed.params, parsed.query, parsed.fragment))
+        
+        return normalized
+    
     def _create_performance_tab(self, parent):
         """Create performance optimization tab."""
         main_frame = ttk.LabelFrame(parent, text="PERFORMANCE OPTIMIZATION", 
@@ -274,10 +388,11 @@ class ScanWindow(tk.Toplevel):
                         variable=self.gpu_var, style='Dark.TCheckbutton').pack(anchor=tk.W)
     
     def _start_attack(self):
-        """Start attack scan."""
+        """Start attack scan or flag hunt."""
         target = self.target_var.get().strip()
         authorized = self.auth_var.get()
         attack_mode = self.attack_mode_var.get()
+        operation_mode = self.operation_mode_var.get()
         
         if not target:
             show_error("Please enter a target URL", self)
@@ -308,50 +423,110 @@ class ScanWindow(tk.Toplevel):
         # Close this window
         self.destroy()
         
-        # Show progress
+        # Initialize assessment first to get session_id
+        normalized_target = self._normalize_target_url(target)
+        assessment_result = run_assessment(normalized_target, authorized=authorized, attack_mode=attack_mode)
+        
+        if assessment_result.get('status') == 'error':
+            show_error(f"Failed to initialize attack: {assessment_result.get('message')}", self.app.root)
+            return
+        
+        session_id = assessment_result.get('session_id')
+        
+        # Open monitor window immediately for live progress
+        from gui.monitor_window import MonitorWindow
+        monitor = MonitorWindow(self.app.root, self.app, session_id)
+        
+        # Store monitor reference for callback
+        self.monitor_ref = monitor
+        
+        # Create progress callback that updates monitor in real-time (thread-safe)
+        def progress_callback(update: Dict):
+            """Callback for real-time attack progress - updates monitor window."""
+            try:
+                # Schedule GUI update on main thread
+                def update_gui():
+                    try:
+                        if hasattr(monitor, 'attack_monitor') and monitor.attack_monitor:
+                            monitor.attack_monitor.add_progress(
+                                update.get('message', ''),
+                                update.get('status', 'info'),
+                                update.get('data')
+                            )
+                            
+                            # Also update log viewer
+                            if hasattr(monitor, 'log_viewer'):
+                                monitor.log_viewer.add_log(update.get('message', ''), update.get('status', 'INFO').upper())
+                    except Exception as e:
+                        pass  # Silently fail to avoid breaking attack
+                
+                # Schedule on main thread
+                self.app.root.after(0, update_gui)
+            except Exception as e:
+                self.logger.debug(f"Progress callback error: {e}")
+        
+        # Show progress dialog
         progress = ProgressDialog(self.app.root, "Launching Attack")
         
         def run_attack():
             """Run attack in async context."""
             try:
-                # Run assessment with attack mode
-                assessment_result = run_assessment(target, authorized=authorized, attack_mode=attack_mode)
+                import asyncio
                 
-                if assessment_result.get('status') == 'error':
-                    return None, assessment_result.get('message')
+                self.logger.info(f"[ATTACK] Normalized target: {normalized_target}")
+                self.logger.info(f"[ATTACK] Session initialized: {session_id}")
                 
-                session_id = assessment_result.get('session_id')
+                # Execute actual attack or flag hunt (this runs probes)
+                async def execute():
+                    from engine.runner import execute_attack
+                    return await execute_attack(
+                        target=normalized_target,
+                        authorized=authorized,
+                        attack_mode=attack_mode,
+                        session_id=session_id,
+                        operation_mode=operation_mode,
+                        progress_callback=progress_callback
+                    )
                 
-                # Configure retry and throttle
-                retry_config = RetryConfig(
-                    max_attempts=max_retries,
-                    timeout=timeout
-                )
-                throttle_config = ThrottleConfig(
-                    requests_per_second=rate_limit
-                )
+                # Run async attack
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    attack_results = loop.run_until_complete(execute())
+                    self.logger.info(f"[ATTACK] Attack completed. Probes executed: {attack_results.get('total_findings', 0)}")
+                finally:
+                    loop.close()
                 
-                # Store session with advanced module flags
+                # Store session with results including exploitation data
                 session_data = {
                     'session_id': session_id,
-                    'target': target,
+                    'target': normalized_target,
                     'started_at': assessment_result.get('started_at'),
                     'status': 'completed',
+                    'operation_mode': operation_mode,
                     'attack_mode': attack_mode,
+                    'crawl_results': attack_results.get('crawl_results', {}),
+                    'findings': attack_results.get('findings', []),
+                    'total_findings': attack_results.get('total_findings', 0),
+                    'flags_found': attack_results.get('flags_found', []) if operation_mode == 'flag_hunt' else [],
+                    'total_flags': attack_results.get('total_flags', 0) if operation_mode == 'flag_hunt' else 0,
+                    'exploitation_results': attack_results.get('exploitation_results', []),
+                    'failed_exploits': attack_results.get('failed_exploits', []),
+                    'progress_updates': progress_updates,
                     'advanced_modules': {
                         'flag_hunter': self.flag_hunter_var.get(),
                         'ghost_operator': self.ghost_operator_var.get(),
                         'logic_breaker': self.logic_breaker_var.get(),
                         'red_team_architect': self.redteam_var.get(),
                         'attacker_mindset': self.mindset_var.get()
-                    },
-                    'findings': assessment_result.get('findings', [])
+                    }
                 }
                 
                 self.store.save_session(session_data, session_id)
                 return session_id, None
             
             except Exception as e:
+                self.logger.error(f"[ATTACK] Attack failed: {e}", exc_info=True)
                 return None, str(e)
         
         def callback(result, error=None):
@@ -367,9 +542,11 @@ class ScanWindow(tk.Toplevel):
                 if attack_error:
                     show_error(f"Attack failed: {attack_error}", self.app.root)
                 else:
+                    # Update existing monitor with completion
+                    if hasattr(self, 'monitor_ref') and hasattr(self.monitor_ref, 'attack_monitor'):
+                        self.monitor_ref.attack_monitor.add_progress("ATTACK COMPLETED SUCCESSFULLY", "success")
+                    
                     show_info(f"Attack completed!\nSession ID: {session_id}", self.app.root)
-                    # Open monitor window
-                    monitor = MonitorWindow(self.app.root, self.app, session_id)
                     # Refresh dashboard
                     if hasattr(self.app, 'dashboard'):
                         self.app.dashboard.refresh_sessions()
