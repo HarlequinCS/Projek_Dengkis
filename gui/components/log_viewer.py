@@ -1,34 +1,46 @@
 """
 Log viewer component for GUI.
-Displays logs in a scrollable text widget.
+Displays logs in a scrollable text widget with dark theme.
 """
 import tkinter as tk
 from tkinter import ttk, scrolledtext
 from typing import Optional
 from pathlib import Path
 
+from gui.theme import COLORS, FONTS
+
 
 class LogViewer(ttk.Frame):
-    """Scrollable log viewer component."""
+    """Scrollable log viewer component with dark theme."""
     
     def __init__(self, parent, height: int = 300):
-        super().__init__(parent)
+        super().__init__(parent, style='Dark.TFrame')
         
         self.log_text = scrolledtext.ScrolledText(
             self,
             height=height,
             wrap=tk.WORD,
             state=tk.DISABLED,
-            font=('Consolas', 9)
+            font=FONTS['monospace'],
+            bg=COLORS['bg_tertiary'],
+            fg=COLORS['fg_primary'],
+            insertbackground=COLORS['accent_red'],
+            selectbackground=COLORS['selection'],
+            selectforeground=COLORS['accent_red'],
+            borderwidth=1,
+            relief='solid',
+            highlightthickness=0
         )
         self.log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Configure text tags for different log levels
-        self.log_text.tag_config('INFO', foreground='blue')
-        self.log_text.tag_config('WARNING', foreground='orange')
-        self.log_text.tag_config('ERROR', foreground='red')
-        self.log_text.tag_config('DEBUG', foreground='gray')
-        self.log_text.tag_config('CRITICAL', foreground='red', background='yellow')
+        # Configure text tags for different log levels with dark theme
+        self.log_text.tag_config('INFO', foreground=COLORS['accent_blue'])
+        self.log_text.tag_config('WARNING', foreground=COLORS['accent_yellow'])
+        self.log_text.tag_config('ERROR', foreground=COLORS['accent_red'])
+        self.log_text.tag_config('DEBUG', foreground=COLORS['fg_secondary'])
+        self.log_text.tag_config('CRITICAL', foreground=COLORS['accent_red'], 
+                                background=COLORS['bg_secondary'])
+        self.log_text.tag_config('SUCCESS', foreground=COLORS['accent_green'])
     
     def add_log(self, message: str, level: str = 'INFO'):
         """Add log message to viewer."""

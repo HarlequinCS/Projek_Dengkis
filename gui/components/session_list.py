@@ -1,39 +1,43 @@
 """
 Session list component for GUI.
-Displays list of saved sessions.
+Displays list of saved sessions with dark theme.
 """
 import tkinter as tk
 from tkinter import ttk
 from typing import List, Dict, Optional, Callable
 from datetime import datetime
 
+from gui.theme import COLORS, FONTS
+
 
 class SessionList(ttk.Frame):
-    """Session list component with selection."""
+    """Session list component with selection and dark theme."""
     
     def __init__(self, parent, on_select: Optional[Callable] = None):
-        super().__init__(parent)
+        super().__init__(parent, style='Dark.TFrame')
         
         self.on_select = on_select
         self.sessions: List[Dict] = []
         
-        # Treeview for session list
-        columns = ('Session ID', 'Target', 'Status', 'Started At')
-        self.tree = ttk.Treeview(self, columns=columns, show='headings', height=10)
+        # Treeview for session list with dark theme
+        columns = ('Session ID', 'Target', 'Status', 'Started At', 'Findings')
+        self.tree = ttk.Treeview(self, columns=columns, show='headings', height=10, style='Dark.Treeview')
         
         # Configure columns
-        self.tree.heading('Session ID', text='Session ID')
-        self.tree.heading('Target', text='Target')
-        self.tree.heading('Status', text='Status')
-        self.tree.heading('Started At', text='Started At')
+        self.tree.heading('Session ID', text='SESSION ID')
+        self.tree.heading('Target', text='TARGET')
+        self.tree.heading('Status', text='STATUS')
+        self.tree.heading('Started At', text='STARTED')
+        self.tree.heading('Findings', text='FINDINGS')
         
-        self.tree.column('Session ID', width=250)
+        self.tree.column('Session ID', width=200)
         self.tree.column('Target', width=200)
         self.tree.column('Status', width=100)
-        self.tree.column('Started At', width=200)
+        self.tree.column('Started At', width=150)
+        self.tree.column('Findings', width=80)
         
-        # Scrollbar
-        scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.tree.yview)
+        # Scrollbar with dark theme
+        scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.tree.yview, style='Dark.Vertical.TScrollbar')
         self.tree.configure(yscrollcommand=scrollbar.set)
         
         # Pack
@@ -57,11 +61,14 @@ class SessionList(ttk.Frame):
         self.tree.delete(*self.tree.get_children())
         
         for session in sessions:
+            findings = session.get('findings', [])
+            findings_count = len(findings)
             self.tree.insert('', tk.END, values=(
                 session.get('session_id', ''),
                 session.get('target', ''),
                 session.get('status', ''),
-                session.get('started_at', '')
+                session.get('started_at', ''),
+                str(findings_count)
             ))
     
     def get_selected_session_id(self) -> Optional[str]:
