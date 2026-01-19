@@ -1,0 +1,15 @@
+httpx
+dnspython
+plotly
+networkx
+pandas
+numpy
+matplotlib
+seaborn
+jinja2
+pyyaml
+markdown
+weasyprint
+pytest
+pytest-asyncio
+coverage

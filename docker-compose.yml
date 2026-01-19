@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  dengkis:
+    build: .
+    container_name: dengkis-app
+    volumes:
+      - ./storage:/app/storage
+      - ./logs:/app/logs
+      - ./reports:/app/reports
+      - ./config:/app/config
+    environment:
+      - PYTHONUNBUFFERED=1
+    # Uncomment if GUI access needed
+    # network_mode: host
+    # For headless operation
+    command: python3 -m cli.main list
