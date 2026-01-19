@@ -4,7 +4,7 @@ Displays list of saved sessions with dark theme.
 """
 import tkinter as tk
 from tkinter import ttk
-from typing import List, Dict, Optional, Callable
+from typing import Dict, List, Optional, Callable
 from datetime import datetime
 
 from gui.theme import COLORS, FONTS

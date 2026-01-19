@@ -6,7 +6,7 @@ import re
 import ipaddress
 import socket
 import asyncio
-from typing import Dict, List, Set, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse
 from datetime import datetime
 

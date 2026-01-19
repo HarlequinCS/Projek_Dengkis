@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import ttk
 import asyncio
 import threading
+from typing import Dict
 
 from engine.runner import run_assessment
 from engine.network.request_handler import AggressiveRequestHandler
@@ -441,6 +442,7 @@ class ScanWindow(tk.Toplevel):
         self.monitor_ref = monitor
         
         # Create progress callback that updates monitor in real-time (thread-safe)
+        # Dict is already imported at module level, but ensure it's in closure
         def progress_callback(update: Dict):
             """Callback for real-time attack progress - updates monitor window."""
             try:

@@ -12,7 +12,7 @@ import uuid
 
 class SessionStore:
     """
-    Session persistence system with JSON and optional SQLite support.
+    Session persistence system with JSON and Optional SQLite support.
     """
     
     def __init__(self, storage_dir: str = 'storage'):
@@ -110,7 +110,7 @@ class SessionStore:
     
     def list_sessions(self, target: Optional[str] = None) -> List[Dict]:
         """
-        List all saved sessions, optionally filtered by target.
+        List all saved sessions, Optional, nally filtered by target.
         
         Args:
             target: Optional target filter

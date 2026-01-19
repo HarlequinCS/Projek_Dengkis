@@ -6,7 +6,7 @@ Think like an attacker: assume everything is vulnerable until proven otherwise.
 import re
 import json
 import asyncio
-from typing import Dict, List, Set, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse, urljoin, parse_qs, urlencode, unquote
 from html.parser import HTMLParser
 import httpx

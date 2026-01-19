@@ -3,7 +3,7 @@ Retry and timeout utilities for network operations.
 Implements exponential backoff with graceful failure handling.
 """
 import asyncio
-from typing import Callable, TypeVar, Optional, Any
+from typing import Callable, Optional, TypeVar, Any
 import time
 from functools import wraps
 

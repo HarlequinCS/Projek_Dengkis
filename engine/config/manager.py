@@ -145,7 +145,7 @@ class ConfigManager:
         
         Args:
             config: Configuration to validate
-            schema: Validation schema (optional, uses default if not provided)
+            schema: Validation schema (Optional, uses default if not provided)
             
         Returns:
             True if valid, False otherwise

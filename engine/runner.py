@@ -5,10 +5,11 @@ Performs aggressive crawling, payload injection, and vulnerability exploitation.
 """
 import asyncio
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Callable
 import httpx
 
 from engine.core.session import TestSession
+from engine.core.advanced_result import AssessmentResult
 from engine.attack.engine import AttackEngine
 from engine.logging.logger import get_logger
 

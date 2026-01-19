@@ -3,7 +3,7 @@ Batch scanning functionality for PROJEK DENGKIS.
 Allows scanning multiple targets in sequence or parallel.
 """
 import asyncio
-from typing import List, Dict, Optional, Callable
+from typing import Dict, List, Optional, Callable
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 import uuid

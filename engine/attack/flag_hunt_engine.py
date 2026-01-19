@@ -4,7 +4,7 @@ Optimized for finding flags in CTF competitions.
 """
 import asyncio
 import re
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Set
 from urllib.parse import urlparse, urljoin
 import httpx
 import socket

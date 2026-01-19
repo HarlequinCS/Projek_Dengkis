@@ -71,7 +71,7 @@ class DengkisLogger:
     
     def get_logger(self, session_id: Optional[str] = None):
         """
-        Get logger instance with optional session ID.
+        Get logger instance with Optional session ID.
         
         Args:
             session_id: Optional session ID to attach to logs
@@ -116,7 +116,7 @@ _logger_instance: Optional[DengkisLogger] = None
 
 def get_logger(session_id: Optional[str] = None) -> logging.LoggerAdapter:
     """
-    Get global logger instance with optional session ID.
+    Get global logger instance with Optional session ID.
     
     Args:
         session_id: Optional session ID to attach to logs

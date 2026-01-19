@@ -4,7 +4,7 @@ Maximizes data retrieval after vulnerability confirmation.
 """
 import re
 import asyncio
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Set
 import httpx
 
 from engine.logging.logger import get_logger

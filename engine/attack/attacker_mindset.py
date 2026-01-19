@@ -2,7 +2,7 @@
 ATTACKER MINDSET - Enhanced Reporting with Attacker Insights
 Converts technical data into actionable red team intelligence.
 """
-from typing import Dict, List
+from typing import Dict, List, List
 from datetime import datetime
 
 

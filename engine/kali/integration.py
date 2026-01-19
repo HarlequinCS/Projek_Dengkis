@@ -6,7 +6,7 @@ import os
 import subprocess
 import sqlite3
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from datetime import datetime
 
 from engine.logging.logger import get_logger

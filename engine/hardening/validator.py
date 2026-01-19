@@ -42,7 +42,7 @@ class EnvironmentValidator:
             "yaml": "yaml"
         }
         
-        optional_deps = {
+        Optional, nal_deps = {
             "weasyprint": "weasyprint"
         }
         
@@ -55,13 +55,13 @@ class EnvironmentValidator:
                 results["missing"].append(dep_name)
                 results["all_installed"] = False
         
-        # Check optional dependencies
-        for dep_name, import_name in optional_deps.items():
+        # Check Optional dependencies
+        for dep_name, import_name in Optional, nal_deps.items():
             try:
                 __import__(import_name)
                 results["installed"].append(dep_name)
             except ImportError:
-                results["warnings"].append(f"{dep_name} (optional) not installed")
+                results["warnings"].append(f"{dep_name} (Optional) not installed")
         
         return results
     

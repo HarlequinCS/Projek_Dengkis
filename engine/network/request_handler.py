@@ -356,7 +356,7 @@ class AggressiveRequestHandler:
                 
                 # Extract security headers
                 security_headers = [
-                    "X-Frame-Options", "X-Content-Type-Options",
+                    "X-Frame-Optional, ns", "X-Content-Type-Optional, ns",
                     "Strict-Transport-Security", "Content-Security-Policy",
                     "X-XSS-Protection", "Referrer-Policy"
                 ]
@@ -425,7 +425,7 @@ class AggressiveRequestHandler:
                 url = urljoin(target, vector)
                 
                 # Test with various request methods
-                methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"]
+                methods = ["GET", "POST", "PUT", "DELETE", "Optional, NS", "HEAD"]
                 for method in methods:
                     try:
                         response = await session.request(
@@ -446,7 +446,7 @@ class AggressiveRequestHandler:
                         boundary_results["results"].append(result)
                         
                         # Detect anomalies
-                        if method == "OPTIONS" and "Allow" in response.headers:
+                        if method == "Optional, NS" and "Allow" in response.headers:
                             allowed_methods = response.headers["Allow"].split(", ")
                             if len(allowed_methods) > 5:
                                 boundary_results["anomalies"].append({

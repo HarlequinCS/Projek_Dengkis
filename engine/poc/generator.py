@@ -2,7 +2,7 @@
 ONE-CLICK PoC GENERATOR - Instant exploit reproduction
 Generates ready-to-use PoC commands for every finding.
 """
-from typing import Dict
+from typing import Dict, Dict
 import urllib.parse
 
 

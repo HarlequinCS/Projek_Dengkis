@@ -6,7 +6,7 @@ import os
 import sys
 import subprocess
 import platform
-from typing import Optional, Dict
+from typing import Dict, Optional, Dict
 from pathlib import Path
 
 from engine.logging.logger import get_logger
