@@ -472,6 +472,12 @@ class ScanWindow(tk.Toplevel):
         
         def run_attack():
             """Run attack in async context."""
+            # Initialize all variables with safe defaults to prevent NameError
+            attack_results = {}
+            progress_updates = []
+            findings = []
+            stats = {}
+            
             try:
                 import asyncio
                 
@@ -495,14 +501,23 @@ class ScanWindow(tk.Toplevel):
                 asyncio.set_event_loop(loop)
                 try:
                     attack_results = loop.run_until_complete(execute())
+                    # Ensure attack_results is a dict
+                    if not isinstance(attack_results, dict):
+                        self.logger.warning(f"[ATTACK] Attack results is not a dict: {type(attack_results)}")
+                        attack_results = {}
                     self.logger.info(f"[ATTACK] Attack completed. Probes executed: {attack_results.get('total_findings', 0)}")
+                except Exception as e:
+                    self.logger.error(f"[ATTACK] Error during attack execution: {e}", exc_info=True)
+                    attack_results = {}
                 finally:
                     loop.close()
                 
                 # Extract all result data from attack_results with safe defaults
-                progress_updates = attack_results.get("progress_updates", [])
-                findings = attack_results.get("findings", [])
-                stats = attack_results.get("stats", {})
+                # Ensure these are always defined even if attack_results is empty/None
+                if isinstance(attack_results, dict):
+                    progress_updates = attack_results.get("progress_updates", [])
+                    findings = attack_results.get("findings", [])
+                    stats = attack_results.get("stats", {})
                 
                 # Store session with results including exploitation data
                 session_data = {
