@@ -21,20 +21,22 @@ def run_assessment(
     attack_mode: str = "aggressive"
 ) -> Dict:
     """
-    Initiates AGGRESSIVE attack-driven exploitation.
-    This function actively injects payloads and exploits vulnerabilities.
-    
+    Initiates an attack-driven assessment on the specified target.
+
+    This function sets up the initial assessment state and validates authorization.
+    It does not execute the actual attack; use `execute_attack` for full execution.
+
     Args:
-        target: Target system URL
-        authorized: Boolean flag indicating authorization status (REQUIRED)
-        session_id: Optional session ID (generated if not provided)
-        attack_mode: passive, active, or aggressive (default: aggressive)
-        
+        target (str): The target system URL to assess.
+        authorized (bool): Explicit flag confirming authorization to test the target.
+        session_id (Optional[str]): Unique identifier for the session. Generated if omitted.
+        attack_mode (str): Execution intensity: 'passive', 'active', or 'aggressive'.
+
     Returns:
-        Dictionary containing attack results and findings
+        Dict: Initial assessment metadata and status.
     """
     logger = get_logger(session_id)
-    
+
     if not authorized:
         logger.warning(f"[ATTACK] Attack attempt without authorization for target: {target}")
         return {
@@ -42,12 +44,12 @@ def run_assessment(
             "message": "Attack requires explicit authorization flag",
             "target": target
         }
-    
+
     logger.info(f"[ATTACK] Initializing attack on target: {target} (mode: {attack_mode})")
-    
+
     # Create test session for tracking attack state
     session = TestSession(target=target, authorized=authorized)
-    
+
     # Initialize attack components
     assessment_data = {
         "session_id": str(session.session_id),
@@ -58,7 +60,7 @@ def run_assessment(
         "status": "initialized",
         "findings": []
     }
-    
+
     return assessment_data
 
 
@@ -71,19 +73,24 @@ async def execute_attack(
     progress_callback: Optional[Callable] = None
 ) -> Dict:
     """
-    Execute the full attack cycle using the AttackEngine.
-    
+    Executes the full attack lifecycle for the given target.
+
+    Orchestrates discovery, exploitation, and post-exploitation phases using
+    the underlying AttackEngine. Requires explicit authorization.
+
     Args:
-        target: Target URL
-        authorized: Authorization flag
-        attack_mode: passive, active, or aggressive
-        session_id: Optional session ID
-        
+        target (str): The target URL to exploit.
+        authorized (bool): Must be True to proceed with active testing.
+        attack_mode (str): Intensity level of the attack.
+        session_id (Optional[str]): ID to track this specific execution.
+        operation_mode (str): The type of operation: 'attack' or 'flag_hunt'.
+        progress_callback (Optional[Callable]): Async-safe callback for progress updates.
+
     Returns:
-        Dictionary containing complete attack results
+        Dict: Complete results including findings, extracted data, and metadata.
     """
     logger = get_logger(session_id)
-    
+
     if not authorized:
         logger.error("[ATTACK] Attack requires explicit authorization")
         return {
@@ -91,10 +98,10 @@ async def execute_attack(
             "message": "Attack requires explicit authorization flag",
             "target": target
         }
-    
+
     logger.info(f"[ATTACK] Starting attack execution on {target}")
     logger.info(f"[ATTACK] Attack mode: {attack_mode}, Authorized: {authorized}")
-    
+
     # Validate and normalize target URL
     from urllib.parse import urlparse
     if not target or not isinstance(target, str):
@@ -104,13 +111,13 @@ async def execute_attack(
             "message": "Invalid target: must be a non-empty string",
             "target": target
         }
-    
+
     parsed = urlparse(target)
     if not parsed.scheme:
         target = f"https://{target}"
         logger.info(f"[ATTACK] Normalized target URL: {target}")
         parsed = urlparse(target)
-    
+
     # Security: Prevent SSRF by blocking private/localhost IPs (unless explicitly allowed)
     # This is a safety check - can be disabled for authorized internal testing
     if parsed.hostname:
@@ -125,7 +132,7 @@ async def execute_attack(
                 logger.warning(f"[ATTACK] Target is private IP {parsed.hostname} - ensure this is authorized")
         except ValueError:
             pass  # Not an IP, likely a hostname
-    
+
     # Create HTTP session
     async with httpx.AsyncClient(
         verify=False,  # SSL verification disabled for attack
@@ -133,34 +140,34 @@ async def execute_attack(
         follow_redirects=True
     ) as client:
         logger.info(f"[ATTACK] HTTP client initialized, executing first probe...")
-        
+
         # Execute immediate probe to verify connectivity
         try:
             probe_response = await client.get(target)
             logger.info(f"[PROBE] Initial probe executed: GET {target} -> {probe_response.status_code}")
         except Exception as e:
             logger.warning(f"[PROBE] Initial probe failed: {e}")
-        
+
         # Initialize attack engine with operation mode and progress callback
-        engine = AttackEngine(target, attack_mode=attack_mode, session=client, 
+        engine = AttackEngine(target, attack_mode=attack_mode, session=client,
                              operation_mode=operation_mode, progress_callback=progress_callback)
         if operation_mode == "flag_hunt":
             logger.info(f"[FLAG HUNT] Flag hunt engine initialized")
         else:
             logger.info(f"[ATTACK] Attack engine initialized - REAL EXPLOITATION ENABLED")
-        
+
         # Execute attack
         attack_results = await engine.attack()
         logger.info(f"[ATTACK] Attack cycle completed")
-        
+
         # Add session metadata
         attack_results["session_id"] = session_id
         attack_results["authorized"] = authorized
         attack_results["attack_mode"] = attack_mode
         attack_results["status"] = "completed"
-        
+
         logger.info(f"[ATTACK] Attack complete. Found {attack_results.get('total_findings', 0)} vulnerabilities")
-        
+
         return attack_results
 
 
@@ -168,11 +175,11 @@ def perform_aggressive_reconnaissance(target: str, session: TestSession) -> Dict
     """
     Performs aggressive but non-exploitative reconnaissance techniques
     to test system responses to unusual queries.
-    
+
     Args:
         target: Target identifier
         session: Active TestSession object
-        
+
     Returns:
         Dictionary containing reconnaissance findings
     """
@@ -187,7 +194,7 @@ def perform_aggressive_reconnaissance(target: str, session: TestSession) -> Dict
         ],
         "findings": []
     }
-    
+
     return reconnaissance_results
 
 
@@ -195,10 +202,10 @@ def analyze_response_patterns(responses: List[Dict]) -> Dict:
     """
     Analyzes system response patterns to identify potential vulnerabilities
     through behavioral observation rather than exploitation.
-    
+
     Args:
         responses: List of response dictionaries from target system
-        
+
     Returns:
         Dictionary containing pattern analysis results
     """
@@ -208,14 +215,14 @@ def analyze_response_patterns(responses: List[Dict]) -> Dict:
         "anomalies": [],
         "potential_weaknesses": []
     }
-    
+
     # Analyze response consistency, timing, error messages, etc.
     for response in responses:
         if response.get("unusual_behavior"):
             pattern_analysis["anomalies"].append(response)
         if response.get("security_control_evident"):
             pattern_analysis["identified_patterns"].append(response)
-    
+
     return pattern_analysis
 
 
@@ -223,11 +230,11 @@ def configuration_stress_test(target: str, edge_cases: List[str]) -> Dict:
     """
     Examines how systems react to edge cases and boundary conditions
     without causing harm or exploitation.
-    
+
     Args:
         target: Target identifier
         edge_cases: List of edge case scenarios to test
-        
+
     Returns:
         Dictionary containing stress test results
     """
@@ -238,7 +245,7 @@ def configuration_stress_test(target: str, edge_cases: List[str]) -> Dict:
         "boundary_conditions_identified": [],
         "configuration_resilience": "unknown"
     }
-    
+
     return stress_test_results
 
 
@@ -246,11 +253,11 @@ def detect_compliance_deviations(target: str, standards: List[str]) -> Dict:
     """
     Identifies where systems deviate from standard security practices
     through configuration analysis.
-    
+
     Args:
         target: Target identifier
         standards: List of security standards to check against
-        
+
     Returns:
         Dictionary containing compliance deviation findings
     """
@@ -261,18 +268,18 @@ def detect_compliance_deviations(target: str, standards: List[str]) -> Dict:
         "compliance_score": 0.0,
         "recommendations": []
     }
-    
+
     return compliance_results
 
 
 def generate_assessment_report(session: TestSession, results: AssessmentResult) -> Dict:
     """
     Generates comprehensive assessment report from session and results.
-    
+
     Args:
         session: TestSession object
         results: AssessmentResult object
-        
+
     Returns:
         Dictionary containing formatted assessment report
     """
@@ -284,5 +291,5 @@ def generate_assessment_report(session: TestSession, results: AssessmentResult) 
         "findings": results.to_dict(),
         "recommendations": results.generate_recommendations()
     }
-    
+
     return report

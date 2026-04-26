@@ -1,49 +1,167 @@
 # Python
-.venv/
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Environment
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+.ENV
+.env
+
+# Environment Variables
 .env
 .env.local
+.env.*.local
+*.env
 
 # Data & Logs
 data/
 logs/
 *.log
+*.log.*
 *.db
 *.sqlite
 *.sqlite3
+*.db-journal
 
-# IDE
+# IDE - VSCode
 .vscode/
+*.code-workspace
+.history/
+
+# IDE - PyCharm/IntelliJ
 .idea/
+*.iml
+*.iws
+*.ipr
+
+# Project specific
+.junie/
+
+# IDE - Other
 *.swp
 *.swo
 *~
+.project
+.classpath
+.settings/
 
 # Testing
-htmlcov/
+.pytest_cache/
 .coverage
 .coverage.*
 coverage.xml
-.pytest_cache/
-tests/.pytest_cache/
-
-# Build
-*.egg-info/
-dist/
-build/
-.eggs/
+*.cover
+.hypothesis/
+htmlcov/
+.tox/
+.nox/
+nosetests.xml
+test-results/
+junit.xml
 
 # Storage
 storage/schedules.json
 storage/*.db
 /opt/dengkis/db/*.db
 
-# OS
+# Reports & Outputs
+reports/
+output/
+*.html
+*.pdf
+
+# OS Files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini
+
+# Temporary Files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+
+# Security & Secrets (DO NOT COMMIT)
+*.pem
+*.key
+*.crt
+*.cert
+secrets/
+credentials/
+*.secret
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/

@@ -101,4 +101,6 @@
 - [x] Session management robust
 - [x] URL normalization working
 - [x] SSRF warnings implemented
+- [x] Production logging levels set (INFO)
+- [x] Docker/Docker-compose verified
 - [x] Documentation updated

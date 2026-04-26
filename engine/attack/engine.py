@@ -20,17 +20,22 @@ from engine.logging.logger import get_logger
 
 class AttackEngine:
     """
-    Main attack engine that orchestrates:
-    1. Aggressive crawling
-    2. Payload injection
-    3. Response analysis
-    4. Finding generation
+    Main orchestration engine for automated web exploitation.
+
+    Coordinates the entire attack lifecycle, including surface discovery (crawling),
+    vulnerability analysis (injection), business logic testing, and post-exploitation.
+    Supports standard 'attack' mode and specialized 'flag_hunt' mode for CTFs.
+
+    Attributes:
+        target (str): The target URL.
+        attack_mode (str): Execution intensity level.
+        operation_mode (str): The type of assessment to perform.
     """
-    
+
     def __init__(self, target: str, attack_mode: str = "aggressive", session: Optional[httpx.AsyncClient] = None, operation_mode: str = "attack", progress_callback: Optional[Callable] = None):
         """
         Initialize attack engine.
-        
+
         Args:
             target: Target URL
             attack_mode: passive, active, or aggressive
@@ -51,43 +56,43 @@ class AttackEngine:
         self.session = session
         self.progress_callback = progress_callback
         self.logger = get_logger()
-        
+
         self.crawler = AggressiveCrawler(target, session)
         self.injector = PayloadInjector(session, attack_mode)
         self.app_detector = KnownAppDetector()
         self.logic_breaker = LogicBreaker(session)
         self.red_team_architect = RedTeamArchitect(session)
         self.attacker_mindset = AttackerMindset()
-        
+
         # Set progress callback for real-time updates
         if progress_callback:
             self.injector.set_progress_callback(progress_callback)
-        
+
         # Flag hunt engine for CTF mode
         if operation_mode == "flag_hunt":
             from engine.attack.flag_hunt_engine import FlagHuntEngine
             self.flag_hunt_engine = FlagHuntEngine(target, session)
-        
+
         self.findings: List[Dict] = []
         self.crawl_results: Optional[Dict] = None
-    
+
     async def attack(self) -> Dict:
         """
         Execute full attack cycle or flag hunt based on operation_mode.
-        
+
         Returns:
             Dictionary containing attack results and findings
         """
         if self.operation_mode == "flag_hunt":
             return await self._flag_hunt()
-        
+
         return await self._vulnerability_attack()
-    
+
     async def _flag_hunt(self) -> Dict:
         """Execute aggressive flag hunting."""
         self.logger.info(f"[FLAG HUNT] Starting flag hunt on {self.target}")
         flag_results = await self.flag_hunt_engine.hunt_flags()
-        
+
         return {
             "target": self.target,
             "operation_mode": "flag_hunt",
@@ -102,61 +107,74 @@ class AttackEngine:
             "all_flags": flag_results.get("all_flags", {}),
             "status": "completed"
         }
-    
+
     async def _vulnerability_attack(self) -> Dict:
         """
         Execute full vulnerability attack cycle:
-        1. Detect known vulnerable apps
+        1. Detect known vulnerable apps and technology stack
         2. Aggressively crawl attack surface
-        3. Inject payloads into all parameters
+        3. Inject payloads into all parameters (optimized by tech stack)
         4. Analyze responses for vulnerabilities
-        
+
         Returns:
             Dictionary containing attack results and findings
         """
         self.logger.info(f"[ATTACK] Starting attack on {self.target} (mode: {self.attack_mode})")
-        
-        # Step 1: Detect known vulnerable apps
+
+        # Step 1: Detect known vulnerable apps and tech stack
         detected_apps = await self.app_detector.detect(self.target)
+        tech_stack = []
+
+        # Simple tech stack detection from app detector and target URL
         if detected_apps:
             self.logger.warning(f"[ATTACK] Detected {len(detected_apps)} known vulnerable app(s)")
-            # Add tailored endpoints to crawler
             for app in detected_apps:
+                tech_stack.append(app["app_id"])
+                # Add tailored endpoints to crawler
                 tailored_endpoints = self.app_detector.get_tailored_endpoints(app["app_id"])
                 for endpoint in tailored_endpoints:
                     full_url = f"{self.target.rstrip('/')}{endpoint}"
                     self.crawler.endpoints.add(full_url)
-        
+
+        # Heuristic tech stack detection
+        target_lower = self.target.lower()
+        if ".php" in target_lower: tech_stack.append("php")
+        if ".aspx" in target_lower or ".asp" in target_lower: tech_stack.append("asp.net")
+        if ".jsp" in target_lower: tech_stack.append("java")
+
+        self.logger.info(f"[ATTACK] Detected tech stack: {tech_stack}")
+
         # Step 2: Aggressive crawling
         self.logger.info("[ATTACK] Phase 1: Aggressive crawling...")
         self.crawl_results = await self.crawler.crawl(max_depth=3)
-        
+
         endpoints = self.crawl_results.get("endpoints_discovered", [])
         parameters = self.crawl_results.get("parameters", {})
-        
+
         self.logger.info(f"[ATTACK] Discovered {len(endpoints)} endpoints and {sum(len(p) for p in parameters.values())} parameters")
-        
-        # Step 3: Payload injection
+
+        # Step 3: Payload injection (with tech stack optimization)
         self.logger.info("[ATTACK] Phase 2: Payload injection...")
-        injection_findings = await self.injector.inject_all(endpoints, parameters)
+
+        injection_findings = await self.injector.inject_all(endpoints, parameters, tech_stack=tech_stack)
         self.findings.extend(injection_findings)
-        
+
         # Step 4: Test tailored payloads for detected apps
         if detected_apps:
             self.logger.info("[ATTACK] Phase 3: Testing tailored payloads for detected apps...")
             for app in detected_apps:
                 tailored_payloads = self.app_detector.get_tailored_payloads(app["app_id"])
                 await self._test_tailored_payloads(tailored_payloads)
-        
+
         # Step 5: Test business logic vulnerabilities
         self.logger.info("[ATTACK] Phase 4: Business logic testing...")
         logic_findings = await self._test_business_logic(endpoints)
         self.findings.extend(logic_findings)
-        
+
         # Step 6: Generate attacker insights
         self.logger.info("[ATTACK] Phase 5: Generating attacker insights...")
         intelligence_report = self.attacker_mindset.generate_intelligence_report(self.findings)
-        
+
         # Step 7: Generate attack report with exploitation results
         results = {
             "target": self.target,
@@ -181,16 +199,16 @@ class AttackEngine:
             "successful_exploits": len([r for r in self.injector.exploiter.get_exploitation_results() if r.get("success")]),
             "total_exploitation_attempts": len(self.injector.exploiter.get_exploitation_results()) + len(self.injector.exploiter.get_failed_exploits()),
         }
-        
+
         # NEVER return 0 findings silently for known vulnerable apps
         if detected_apps and len(self.findings) == 0:
             self.logger.warning("[ATTACK] WARNING: Known vulnerable app detected but 0 findings!")
             self.logger.warning("[ATTACK] This should NOT happen. Manual testing recommended.")
             results["warning"] = "Known vulnerable app detected but no automated findings. Manual testing required."
-        
+
         self.logger.info(f"[ATTACK] Attack complete. Found {len(self.findings)} potential vulnerabilities")
         return results
-    
+
     async def _test_tailored_payloads(self, tailored_payloads: Dict[str, List[Dict]]):
         """Test tailored payloads for detected apps."""
         for category, payloads in tailored_payloads.items():
@@ -198,12 +216,12 @@ class AttackEngine:
                 endpoint = payload_data.get("endpoint", "")
                 parameter = payload_data.get("parameter", "")
                 payload = payload_data.get("payload", "")
-                
+
                 if not endpoint or not parameter:
                     continue
-                
+
                 full_url = f"{self.target.rstrip('/')}{endpoint}"
-                
+
                 try:
                     # Test GET
                     finding = await self.injector._inject_get_parameter(
@@ -211,7 +229,7 @@ class AttackEngine:
                     )
                     if finding and finding.get("vulnerable"):
                         self.findings.append(finding)
-                    
+
                     # Test POST
                     finding = await self.injector._inject_post_parameter(
                         full_url, parameter, payload, {"category": category, "type": "tailored", "confidence": "high"}
@@ -220,11 +238,11 @@ class AttackEngine:
                         self.findings.append(finding)
                 except Exception as e:
                     self.logger.debug(f"Tailored payload test failed: {e}")
-    
+
     async def _test_business_logic(self, endpoints: List[str]) -> List[Dict]:
         """Test business logic vulnerabilities."""
         logic_findings = []
-        
+
         # Test IDOR on API endpoints
         api_endpoints = [e for e in endpoints if '/api/' in e or '/user/' in e or '/id/' in e]
         for endpoint in api_endpoints[:10]:  # Limit to first 10
@@ -242,7 +260,7 @@ class AttackEngine:
                 # Already has placeholder
                 idor_findings = await self.logic_breaker.discover_idor(endpoint)
                 logic_findings.extend(idor_findings)
-        
+
         # Test integer overflow on endpoints with numeric parameters
         for endpoint in endpoints[:20]:  # Limit testing
             # Look for price/quantity parameters
@@ -252,5 +270,5 @@ class AttackEngine:
                     endpoint, 'price' if 'price' in endpoint.lower() else 'quantity'
                 )
                 logic_findings.extend(overflow_findings)
-        
+
         return logic_findings
