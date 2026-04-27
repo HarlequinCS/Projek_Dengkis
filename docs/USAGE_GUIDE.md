@@ -14,9 +14,41 @@
 # Clone repository
 git clone <repository-url> Projek_Dengkis
 cd Projek_Dengkis
+```
 
-# Install dependencies
+### Install dependencies (recommended)
+
+On Debian-based systems (including Kali), avoid modifying the system Python. Use a virtual environment:
+
+```bash
+# Install venv support (one-time)
+sudo apt install python3-venv -y
+
+# Create and activate a virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Then install requirements inside the venv
 pip install -r requirements.txt
+```
+
+This prevents PEP 668 "externally managed environment" errors when Kali blocks global pip installs.
+
+
+### Fast but risky (not recommended)
+
+Force installation into the system environment (may break OS tools):
+
+```bash
+pip install -r requirements.txt --break-system-packages
+```
+
+### Alternative for standalone CLIs
+
+For single packages, consider pipx:
+
+```bash
+pipx install package-name
 ```
 
 ## Basic Usage

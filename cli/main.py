@@ -347,7 +347,7 @@ def cmd_batch(args):
         return result
 
     try:
-        result = asyncio.run(run_batch())
+        result = run_coro_safe(run_batch())
         print(f"\nBatch scan completed!")
         print(f"Total: {result['total_targets']}")
         print(f"Completed: {result['completed']}")
@@ -476,11 +476,11 @@ def main():
     # Execute command
     try:
         if args.command == 'scan':
-            return asyncio.run(cmd_scan(args))
+            return run_coro_safe(cmd_scan(args))
         elif args.command == 'report':
-            return asyncio.run(cmd_report(args))
+            return run_coro_safe(cmd_report(args))
         elif args.command == 'visualize':
-            return asyncio.run(cmd_visualize(args))
+            return run_coro_safe(cmd_visualize(args))
         elif args.command == 'config':
             return cmd_config(args)
         elif args.command == 'list':
@@ -490,7 +490,7 @@ def main():
         elif args.command == 'search':
             return cmd_search(args)
         elif args.command == 'tui':
-            return asyncio.run(cmd_tui(args))
+            return run_coro_safe(cmd_tui(args))
         else:
             parser.print_help()
             return 1
