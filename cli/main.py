@@ -23,6 +23,32 @@ from engine.logging.logger import get_logger
 from engine.config.manager import ConfigManager
 
 
+def run_coro_safe(coro):
+    """Run coroutine in a safe way even if an event loop is already running.
+
+    If there's an active event loop (e.g., embedded REPL), the coroutine is executed in
+    a separate thread using asyncio.run to create a fresh event loop for that thread.
+    """
+    try:
+        return asyncio.run(coro)
+    except RuntimeError as e:
+        if 'running event loop' in str(e):
+            import threading
+            result = {}
+            def _target():
+                try:
+                    result['value'] = asyncio.run(coro)
+                except Exception as exc:
+                    result['exc'] = exc
+            t = threading.Thread(target=_target)
+            t.start()
+            t.join()
+            if 'exc' in result:
+                raise result['exc']
+            return result.get('value')
+        raise
+
+
 async def cmd_scan(args):
     """
     Executes the 'scan' command.
