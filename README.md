@@ -64,6 +64,7 @@ Detailed documentation is available in the `docs/` directory:
 - [System Architecture](docs/ARCHITECTURE.md)
 - [API Reference](docs/API_REFERENCE.md)
 - [Usage Guide](docs/USAGE_GUIDE.md)
+- [Kali Linux Step-by-Step Guide](docs/KALI_LINUX_GUIDE.md)
 - [Attack Engine Internals](docs/ATTACK_ENGINE.md)
 - [Performance Optimization](docs/PERFORMANCE_TUI.md)
 

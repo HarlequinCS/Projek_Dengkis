@@ -24,6 +24,10 @@ setup(
     author='PROJEK DENGKIS Team',
     packages=find_packages(),
     install_requires=requirements,
+    extras_require={
+        'http2': ['h2'],
+        'dev': ['pytest-cov', 'pytest', 'pytest-asyncio', 'coverage'],
+    },
     python_requires='>=3.8',
     entry_points={
         'console_scripts': [

@@ -1,4 +1,7 @@
+# Core HTTP client
 httpx
+
+# Core dependencies
 dnspython
 plotly
 networkx
@@ -10,15 +13,22 @@ jinja2
 pyyaml
 markdown
 weasyprint
+
+# Testing dependencies
 pytest
 pytest-asyncio
+pytest-cov
 coverage
+
 # Performance optimization
 ujson
+
 # TUI Framework
 textual
 rich
+
 # GPU acceleration (optional)
 pyopencl
 cupy-cuda12x; sys_platform != "win32"
+
 # Zero-copy processing (built-in mmap)

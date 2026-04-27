@@ -31,7 +31,8 @@ class AggressiveRequestHandler:
         timeout: float = 30.0,
         retry_config: Optional[RetryConfig] = None,
         throttle_config: Optional[ThrottleConfig] = None,
-        session_id: Optional[str] = None
+        session_id: Optional[str] = None,
+        enable_http2: bool = False
     ):
         """
         Initialize request handler.
@@ -42,6 +43,7 @@ class AggressiveRequestHandler:
             retry_config: Retry configuration
             throttle_config: Throttle configuration
             session_id: Session ID for logging
+            enable_http2: Enable HTTP/2 support (requires h2 library). Defaults to False.
         """
         self.stealth_mode = stealth_mode
         self.timeout = timeout
@@ -60,11 +62,25 @@ class AggressiveRequestHandler:
         ssl_context.check_hostname = False
         ssl_context.verify_mode = ssl.CERT_NONE
 
+        # Handle HTTP/2 support with dependency-aware fallback
+        http2_enabled = enable_http2
+        if enable_http2:
+            try:
+                import h2
+                self.logger.debug("h2 library detected, HTTP/2 support enabled")
+            except ImportError:
+                self.logger.warning(
+                    "HTTP/2 requested but 'h2' library not installed. "
+                    "Install with: pip install httpx[http2] or pip install h2. "
+                    "Falling back to HTTP/1.1"
+                )
+                http2_enabled = False
+
         self.client_config = {
             "timeout": httpx.Timeout(timeout, connect=10.0),
             "verify": False,  # SSL verification disabled for assessment
             "follow_redirects": True,
-            "http2": True,    # Enable HTTP/2 for multiplexing
+            "http2": http2_enabled,    # HTTP/2 support (optional, with fallback)
             "limits": httpx.Limits(
                 max_keepalive_connections=50,
                 max_connections=100,
@@ -361,7 +377,7 @@ class AggressiveRequestHandler:
 
                 # Extract security headers
                 security_headers = [
-                    "X-Frame-Optional, ns", "X-Content-Type-Optional, ns",
+                    "X-Frame-Options", "X-Content-Type-Options",
                     "Strict-Transport-Security", "Content-Security-Policy",
                     "X-XSS-Protection", "Referrer-Policy"
                 ]
@@ -430,7 +446,7 @@ class AggressiveRequestHandler:
                 url = urljoin(target, vector)
 
                 # Test with various request methods
-                methods = ["GET", "POST", "PUT", "DELETE", "Optional, NS", "HEAD"]
+                methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"]
                 for method in methods:
                     try:
                         response = await session.request(
@@ -451,7 +467,7 @@ class AggressiveRequestHandler:
                         boundary_results["results"].append(result)
 
                         # Detect anomalies
-                        if method == "Optional, NS" and "Allow" in response.headers:
+                        if method == "OPTIONS" and "Allow" in response.headers:
                             allowed_methods = response.headers["Allow"].split(", ")
                             if len(allowed_methods) > 5:
                                 boundary_results["anomalies"].append({
